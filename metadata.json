@@ -1,0 +1,6 @@
+{
+  "name": "NovaStore",
+  "description": "Next-generation Android app marketplace and distribution hub with curated listings, direct external downloads, update channels, and community submissions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
