@@ -17,10 +17,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
+import java.io.File
 import java.util.UUID
 
 class AppRepository(private val context: Context) {
     private val tag = "AppRepository"
+    private val diskFile = File(context.filesDir, "persisted_apps.json")
 
     private val _applications = MutableStateFlow<List<ApplicationItem>>(emptyList())
     val applications: StateFlow<List<ApplicationItem>> = _applications.asStateFlow()
@@ -40,8 +43,54 @@ class AppRepository(private val context: Context) {
     private var currentUserId: String = "guest_user"
 
     init {
-        setupFirebase()
         loadInitialApps()
+        setupFirebase()
+    }
+
+    private fun loadApplicationsFromDisk(): List<ApplicationItem>? {
+        return try {
+            if (diskFile.exists() && diskFile.canRead()) {
+                val text = diskFile.readText()
+                if (text.isNotBlank()) {
+                    val arr = JSONArray(text)
+                    val list = mutableListOf<ApplicationItem>()
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.optJSONObject(i)
+                        if (obj != null) {
+                            list.add(ApplicationItem.fromJson(obj))
+                        }
+                    }
+                    if (list.isNotEmpty()) list else null
+                } else null
+            } else null
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to load persisted apps: ${e.message}")
+            null
+        }
+    }
+
+    private fun saveApplicationsToDisk(apps: List<ApplicationItem>) {
+        try {
+            val arr = JSONArray()
+            apps.forEach { arr.put(it.toJson()) }
+            diskFile.writeText(arr.toString())
+            Log.d(tag, "Permanently saved ${apps.size} applications to disk")
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to persist apps to disk: ${e.message}")
+        }
+    }
+
+    private fun loadInitialApps() {
+        val diskApps = loadApplicationsFromDisk()
+        if (!diskApps.isNullOrEmpty()) {
+            _applications.value = diskApps
+            _isLoading.value = false
+        } else {
+            val curated = getCuratedSampleApps()
+            _applications.value = curated
+            saveApplicationsToDisk(curated)
+            _isLoading.value = false
+        }
     }
 
     private fun setupFirebase() {
@@ -60,12 +109,10 @@ class AppRepository(private val context: Context) {
             firestore = FirebaseFirestore.getInstance()
             auth = FirebaseAuth.getInstance()
 
-            // Seamless background authentication: No login screen required
             signInSilently()
             listenToApplications()
         } catch (e: Exception) {
             Log.e(tag, "Firebase initialization fallback: ${e.message}", e)
-            _applications.value = getCuratedSampleApps()
             _isLoading.value = false
         }
     }
@@ -91,7 +138,6 @@ class AppRepository(private val context: Context) {
 
     private fun listenToApplications() {
         val db = firestore ?: return
-        _isLoading.value = true
 
         snapshotListener?.remove()
         snapshotListener = db.collection("applications")
@@ -100,9 +146,6 @@ class AppRepository(private val context: Context) {
                 _isLoading.value = false
                 if (error != null) {
                     Log.w(tag, "Firestore listen error: ${error.message}")
-                    if (_applications.value.isEmpty()) {
-                        _applications.value = getCuratedSampleApps()
-                    }
                     return@addSnapshotListener
                 }
 
@@ -113,11 +156,13 @@ class AppRepository(private val context: Context) {
                         }
                     }
                     _applications.value = list
+                    saveApplicationsToDisk(list)
                 } else {
-                    // Pre-populate initial catalog if empty
+                    // Pre-populate initial catalog if cloud collection is empty
                     if (_applications.value.isEmpty()) {
                         val curated = getCuratedSampleApps()
                         _applications.value = curated
+                        saveApplicationsToDisk(curated)
                         seedSampleAppsIfEmpty(curated)
                     }
                 }
@@ -138,15 +183,9 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    private fun loadInitialApps() {
-        if (_applications.value.isEmpty()) {
-            _applications.value = getCuratedSampleApps()
-        }
-    }
-
     suspend fun publishApplication(app: ApplicationItem): Result<String> {
         return try {
-            val db = firestore ?: throw IllegalStateException("Firestore is not available")
+            val db = firestore
             val id = if (app.appId.isNotBlank()) app.appId else "app_" + UUID.randomUUID().toString().replace("-", "").take(12)
             val updatedApp = app.copy(
                 appId = id,
@@ -155,23 +194,27 @@ class AppRepository(private val context: Context) {
                 updatedAt = System.currentTimeMillis()
             )
 
-            db.collection("applications").document(id).set(updatedApp.toMap()).await()
+            if (db != null) {
+                db.collection("applications").document(id).set(updatedApp.toMap()).await()
+            }
 
-            // Update local state immediately so UI refreshes without waiting
+            // Immediately update and persist to disk so app is never lost across updates
             val currentList = _applications.value.toMutableList()
             currentList.removeAll { it.appId == id }
             currentList.add(0, updatedApp)
             _applications.value = currentList
+            saveApplicationsToDisk(currentList)
 
             Result.success(id)
         } catch (e: Exception) {
-            Log.e(tag, "Failed to publish app: ${e.message}", e)
-            // Even if remote write fails due to network/rules, save locally for seamless testing
+            Log.e(tag, "Remote publish failed, writing to local persistent storage: ${e.message}", e)
             val id = if (app.appId.isNotBlank()) app.appId else "local_" + UUID.randomUUID().toString().take(8)
             val updatedApp = app.copy(appId = id, submitterUid = currentUserId)
             val currentList = _applications.value.toMutableList()
+            currentList.removeAll { it.appId == id }
             currentList.add(0, updatedApp)
             _applications.value = currentList
+            saveApplicationsToDisk(currentList)
             Result.success(id)
         }
     }
@@ -187,7 +230,6 @@ class AppRepository(private val context: Context) {
             )
             db.collection("reports").document(reportId).set(fullReport.toMap()).await()
 
-            // Increment report count on the app
             if (report.appId.isNotBlank()) {
                 val appRef = db.collection("applications").document(report.appId)
                 db.runTransaction { transaction ->
@@ -200,7 +242,7 @@ class AppRepository(private val context: Context) {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(tag, "Failed to submit report: ${e.message}", e)
-            Result.success(Unit) // Don't crash user
+            Result.success(Unit)
         }
     }
 
@@ -213,9 +255,15 @@ class AppRepository(private val context: Context) {
                 if (it.appId == appId) it.copy(publicationStatus = newStatus) else it
             }
             _applications.value = currentList
+            saveApplicationsToDisk(currentList)
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            val currentList = _applications.value.map {
+                if (it.appId == appId) it.copy(publicationStatus = newStatus) else it
+            }
+            _applications.value = currentList
+            saveApplicationsToDisk(currentList)
+            Result.success(Unit)
         }
     }
 
@@ -228,12 +276,14 @@ class AppRepository(private val context: Context) {
                 if (it.appId == updatedApp.appId) updatedApp else it
             }
             _applications.value = currentList
+            saveApplicationsToDisk(currentList)
             Result.success(Unit)
         } catch (e: Exception) {
             val currentList = _applications.value.map {
                 if (it.appId == updatedApp.appId) updatedApp else it
             }
             _applications.value = currentList
+            saveApplicationsToDisk(currentList)
             Result.success(Unit)
         }
     }
@@ -241,10 +291,14 @@ class AppRepository(private val context: Context) {
     suspend fun deleteApp(appId: String): Result<Unit> {
         return try {
             firestore?.collection("applications")?.document(appId)?.delete()?.await()
-            _applications.value = _applications.value.filter { it.appId != appId }
+            val currentList = _applications.value.filter { it.appId != appId }
+            _applications.value = currentList
+            saveApplicationsToDisk(currentList)
             Result.success(Unit)
         } catch (e: Exception) {
-            _applications.value = _applications.value.filter { it.appId != appId }
+            val currentList = _applications.value.filter { it.appId != appId }
+            _applications.value = currentList
+            saveApplicationsToDisk(currentList)
             Result.success(Unit)
         }
     }

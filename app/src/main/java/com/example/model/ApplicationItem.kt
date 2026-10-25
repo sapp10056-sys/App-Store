@@ -1,5 +1,8 @@
 package com.example.model
 
+import org.json.JSONArray
+import org.json.JSONObject
+
 /**
  * Model representing an application listed on NovaStore.
  */
@@ -60,6 +63,38 @@ data class ApplicationItem(
         )
     }
 
+    fun toJson(): JSONObject {
+        val json = JSONObject()
+        json.put("appId", appId)
+        json.put("appName", appName)
+        json.put("developerName", developerName)
+        json.put("developerEmail", developerEmail)
+        json.put("logoUrl", logoUrl)
+        json.put("shortDescription", shortDescription)
+        json.put("fullDescription", fullDescription)
+        json.put("category", category)
+        json.put("versionName", versionName)
+        json.put("versionCode", versionCode)
+        json.put("minAndroidVersion", minAndroidVersion)
+        json.put("downloadUrl", downloadUrl)
+        json.put("privacyPolicyUrl", privacyPolicyUrl)
+        json.put("supportUrl", supportUrl)
+        json.put("permissionsDisclosure", permissionsDisclosure)
+        val arr = JSONArray()
+        screenshotUrls.forEach { arr.put(it) }
+        json.put("screenshotUrls", arr)
+        json.put("submitterUid", submitterUid)
+        json.put("createdAt", createdAt)
+        json.put("updatedAt", updatedAt)
+        json.put("publicationStatus", publicationStatus)
+        json.put("reportCount", reportCount)
+        json.put("rating", rating.toDouble())
+        json.put("downloadCount", downloadCount)
+        json.put("isFeatured", isFeatured)
+        json.put("isTrending", isTrending)
+        return json
+    }
+
     companion object {
         fun fromMap(id: String, map: Map<String, Any?>): ApplicationItem {
             @Suppress("UNCHECKED_CAST")
@@ -90,6 +125,43 @@ data class ApplicationItem(
                 downloadCount = (map["downloadCount"] as? Number)?.toLong() ?: 1200L,
                 isFeatured = (map["isFeatured"] as? Boolean) ?: false,
                 isTrending = (map["isTrending"] as? Boolean) ?: false
+            )
+        }
+
+        fun fromJson(json: JSONObject): ApplicationItem {
+            val screenshots = mutableListOf<String>()
+            val arr = json.optJSONArray("screenshotUrls")
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    screenshots.add(arr.optString(i))
+                }
+            }
+            return ApplicationItem(
+                appId = json.optString("appId"),
+                appName = json.optString("appName"),
+                developerName = json.optString("developerName"),
+                developerEmail = json.optString("developerEmail"),
+                logoUrl = json.optString("logoUrl"),
+                shortDescription = json.optString("shortDescription"),
+                fullDescription = json.optString("fullDescription"),
+                category = json.optString("category", "Tools"),
+                versionName = json.optString("versionName", "1.0.0"),
+                versionCode = json.optLong("versionCode", 1L),
+                minAndroidVersion = json.optString("minAndroidVersion", "Android 8.0 (API 26)"),
+                downloadUrl = json.optString("downloadUrl"),
+                privacyPolicyUrl = json.optString("privacyPolicyUrl"),
+                supportUrl = json.optString("supportUrl"),
+                permissionsDisclosure = json.optString("permissionsDisclosure"),
+                screenshotUrls = screenshots,
+                submitterUid = json.optString("submitterUid"),
+                createdAt = json.optLong("createdAt", System.currentTimeMillis()),
+                updatedAt = json.optLong("updatedAt", System.currentTimeMillis()),
+                publicationStatus = json.optString("publicationStatus", "published"),
+                reportCount = json.optLong("reportCount", 0L),
+                rating = json.optDouble("rating", 4.8).toFloat(),
+                downloadCount = json.optLong("downloadCount", 1200L),
+                isFeatured = json.optBoolean("isFeatured", false),
+                isTrending = json.optBoolean("isTrending", false)
             )
         }
     }

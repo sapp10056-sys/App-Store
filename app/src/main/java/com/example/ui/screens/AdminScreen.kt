@@ -26,7 +26,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -165,53 +169,183 @@ fun AdminScreen(
                 )
             }
 
+    var customConfigUrl by remember { mutableStateOf(viewModel.preferencesManager.getUpdateConfigUrl()) }
+
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Catalog Moderation (${allApps.size})") }
+                    text = { Text("Catalog (${allApps.size})") }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Flagged Listings (${allApps.count { it.reportCount > 0 }})") }
+                    text = { Text("Flagged (${allApps.count { it.reportCount > 0 }})") }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Update Config") }
                 )
             }
 
-            val displayList = if (selectedTab == 0) allApps else allApps.filter { it.reportCount > 0 }
+            if (selectedTab == 2) {
+                val updateInfo by viewModel.updateInfo.collectAsState()
+                val isChecking by viewModel.isCheckingUpdate.collectAsState()
 
-            if (displayList.isEmpty()) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text(
-                        text = if (selectedTab == 0) "No applications listed." else "No flagged applications reported.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("GitHub app-update.json Endpoint", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                "Configure your remote JSON endpoint. For real-time updates without downloading new APKs, this repository must be PUBLIC on GitHub.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = customConfigUrl,
+                                onValueChange = { customConfigUrl = it },
+                                label = { Text("Raw GitHub URL") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        viewModel.preferencesManager.setUpdateConfigUrl(customConfigUrl.trim())
+                                        viewModel.checkAppUpdates()
+                                        Toast.makeText(context, "URL saved & synchronized!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Save URL")
+                                }
+
+                                OutlinedButton(
+                                    onClick = { viewModel.checkAppUpdates(silent = false) },
+                                    enabled = !isChecking,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(if (isChecking) "Checking..." else "Test Sync")
+                                }
+                            }
+                        }
+                    }
+
+                    // Active Live Status Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (updateInfo?.forceUpdate == true) ErrorRed.copy(alpha = 0.12f) else SuccessGreen.copy(alpha = 0.12f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (updateInfo?.forceUpdate == true) Icons.Default.Info else Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = if (updateInfo?.forceUpdate == true) ErrorRed else SuccessGreen
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (updateInfo?.forceUpdate == true) "FORCE UPDATE ACTIVE (App Locked)" else "APP UNLOCKED (Normal Mode)",
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (updateInfo?.forceUpdate == true) ErrorRed else SuccessGreen
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Latest Remote Version: v${updateInfo?.latestVersionName ?: "1.0.0"} (Build ${updateInfo?.latestVersionCode ?: 1})\nForce Update Status: ${updateInfo?.forceUpdate == true}\nPolling Interval: Auto-sync every 8 seconds",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    // Instructions Card for User
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Troubleshooting & GitHub Guide", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "1. GitHub Visibility: Go to github.com -> Repository Settings -> Change to PUBLIC. If private, GitHub blocks raw access with 404.\n\n" +
+                                "2. Real-time Force Update: Edit app-update.json directly on GitHub. Setting 'forceUpdate': true will instantly lock user APKs within 8 seconds without requiring any APK re-download. Setting 'forceUpdate': false instantly unlocks it.\n\n" +
+                                "3. Package Conflict Fix: If 'Package conflicts with an existing package' appears on your phone, uninstall the previously installed NovaStore app once from your device. Future updates will then install smoothly.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(displayList) { app ->
-                        AdminAppItem(
-                            app = app,
-                            onEdit = { editingApp = app },
-                            onStatusChange = { newStatus ->
-                                scope.launch {
-                                    viewModel.repository.updateAppStatus(app.appId, newStatus)
-                                    Toast.makeText(context, "Status updated to $newStatus", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            onDelete = { deletingAppId = app.appId }
+                val displayList = if (selectedTab == 0) allApps else allApps.filter { it.reportCount > 0 }
+
+                if (displayList.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (selectedTab == 0) "No applications listed." else "No flagged applications reported.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(displayList) { app ->
+                            AdminAppItem(
+                                app = app,
+                                onEdit = { editingApp = app },
+                                onStatusChange = { newStatus ->
+                                    scope.launch {
+                                        viewModel.repository.updateAppStatus(app.appId, newStatus)
+                                        Toast.makeText(context, "Status updated to $newStatus", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                onDelete = { deletingAppId = app.appId }
+                            )
+                        }
                     }
                 }
             }
