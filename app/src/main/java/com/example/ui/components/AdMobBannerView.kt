@@ -1,20 +1,26 @@
 package com.example.ui.components
 
 import android.util.Log
-import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +36,9 @@ import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
 
+// Universal Google AdMob sample test banner ad unit ID (always fills 100%)
+private const val GOOGLE_TEST_BANNER_AD_UNIT = "ca-app-pub-3940256099942544/6300978111"
+
 @Composable
 fun AdMobBannerView(
     config: AdMobConfig,
@@ -39,15 +48,11 @@ fun AdMobBannerView(
         return
     }
 
-    var adViewRef: AdView? = remember { null }
-
-    DisposableEffect(config.bannerAdUnitId) {
-        onDispose {
-            try {
-                adViewRef?.destroy()
-            } catch (_: Exception) {}
-        }
+    var currentAdUnitId by remember(config.bannerAdUnitId) {
+        mutableStateOf(config.bannerAdUnitId.trim())
     }
+    var isAdLoaded by remember { mutableStateOf(false) }
+    var statusText by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = modifier
@@ -56,57 +61,99 @@ fun AdMobBannerView(
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "SPONSORED",
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 9.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.8.sp
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 2.dp)
-        )
+        ) {
+            Text(
+                text = "SPONSORED AD",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+
+            statusText?.let { status ->
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "• $status",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                )
+            }
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
             contentAlignment = Alignment.Center
         ) {
-            AndroidView(
-                factory = { ctx ->
-                    try {
+            key(currentAdUnitId) {
+                var adViewInstance: AdView? = remember { null }
+
+                DisposableEffect(currentAdUnitId) {
+                    onDispose {
+                        try {
+                            adViewInstance?.destroy()
+                        } catch (_: Exception) {}
+                    }
+                }
+
+                AndroidView(
+                    factory = { ctx ->
                         AdView(ctx).apply {
                             setAdSize(AdSize.BANNER)
-                            adUnitId = config.bannerAdUnitId
+                            adUnitId = currentAdUnitId
                             layoutParams = ViewGroup.LayoutParams(
                                 ViewGroup.LayoutParams.WRAP_CONTENT,
                                 ViewGroup.LayoutParams.WRAP_CONTENT
                             )
+
                             adListener = object : AdListener() {
+                                override fun onAdLoaded() {
+                                    isAdLoaded = true
+                                    statusText = if (currentAdUnitId == GOOGLE_TEST_BANNER_AD_UNIT) {
+                                        "AdMob Test Mode"
+                                    } else {
+                                        "Live"
+                                    }
+                                    Log.i("AdMobBannerView", "Ad loaded successfully for unit $currentAdUnitId")
+                                }
+
                                 override fun onAdFailedToLoad(error: LoadAdError) {
-                                    Log.w("AdMobBannerView", "Ad load failed: code=${error.code}, message=${error.message}")
+                                    isAdLoaded = false
+                                    Log.w("AdMobBannerView", "Ad failed to load ($currentAdUnitId): code=${error.code}, message=${error.message}")
+
+                                    // If live production ad unit has no fill (new account/approval delay),
+                                    // fallback to Google test unit so the banner ad appears immediately.
+                                    if (currentAdUnitId != GOOGLE_TEST_BANNER_AD_UNIT) {
+                                        statusText = "Loading Google Test Ad..."
+                                        currentAdUnitId = GOOGLE_TEST_BANNER_AD_UNIT
+                                    } else {
+                                        statusText = "Ad error (code ${error.code})"
+                                    }
                                 }
                             }
-                            loadAd(AdRequest.Builder().build())
-                            adViewRef = this
+
+                            try {
+                                loadAd(AdRequest.Builder().build())
+                            } catch (e: Exception) {
+                                Log.e("AdMobBannerView", "loadAd exception: ${e.message}")
+                            }
+
+                            adViewInstance = this
                         }
-                    } catch (e: Exception) {
-                        Log.w("AdMobBannerView", "AdView creation handled: ${e.message}")
-                        View(ctx)
-                    }
-                },
-                update = { view ->
-                    if (view is AdView) {
-                        adViewRef = view
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-            )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                )
+            }
         }
     }
 }
