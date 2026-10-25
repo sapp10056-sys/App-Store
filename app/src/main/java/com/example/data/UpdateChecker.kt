@@ -1,5 +1,6 @@
 package com.example.data
 
+import android.content.Context
 import android.util.Log
 import com.example.model.AppUpdateInfo
 import kotlinx.coroutines.Dispatchers
@@ -9,41 +10,88 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-class UpdateChecker(private val preferencesManager: PreferencesManager) {
+class UpdateChecker(
+    private val context: Context? = null,
+    private val preferencesManager: PreferencesManager
+) {
+    constructor(preferencesManager: PreferencesManager) : this(null, preferencesManager)
+
     private val tag = "UpdateChecker"
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(6, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
         .cache(null)
         .build()
 
     suspend fun checkForUpdate(currentVersionCode: Int): Result<AppUpdateInfo?> {
         return withContext(Dispatchers.IO) {
+            val configuredUrl = preferencesManager.getUpdateConfigUrl().trim()
+
+            // Candidate URLs to eliminate CDN caching and branch discrepancies
+            val candidateUrls = mutableListOf<String>()
+            candidateUrls.add(appendCacheBuster(configuredUrl))
+
+            if (configuredUrl.contains("/main/")) {
+                candidateUrls.add(appendCacheBuster(configuredUrl.replace("/main/", "/master/")))
+            } else if (configuredUrl.contains("/master/")) {
+                candidateUrls.add(appendCacheBuster(configuredUrl.replace("/master/", "/main/")))
+            }
+
+            // GitHub API contents direct endpoint (returns fresh raw content bypassing Fastly CDN)
+            val rawRegex = Regex("""^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)$""")
+            val match = rawRegex.matchEntire(configuredUrl)
+            if (match != null) {
+                val (owner, repo, branch, path) = match.destructured
+                candidateUrls.add("https://api.github.com/repos/$owner/$repo/contents/$path?ref=$branch")
+            }
+
+            var fetchedJsonString: String? = null
+
+            for (url in candidateUrls) {
+                try {
+                    val requestBuilder = Request.Builder()
+                        .url(url)
+                        .header("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate")
+                        .header("Pragma", "no-cache")
+                        .header("Expires", "0")
+
+                    if (url.contains("api.github.com")) {
+                        requestBuilder.header("Accept", "application/vnd.github.raw")
+                    }
+
+                    val response = client.newCall(requestBuilder.build()).execute()
+                    if (response.isSuccessful) {
+                        val body = response.body?.string()
+                        if (!body.isNullOrBlank()) {
+                            fetchedJsonString = body
+                            Log.d(tag, "Successfully fetched live update config from: $url")
+                            break
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(tag, "Candidate url attempt failed ($url): ${e.message}")
+                }
+            }
+
+            // Fallback to local asset if remote GitHub repo is not yet public, 404s, or device is offline
+            if (fetchedJsonString == null && context != null) {
+                try {
+                    context.assets.open("app-update.json").use { stream ->
+                        fetchedJsonString = stream.bufferedReader().use { it.readText() }
+                        Log.d(tag, "Loaded local assets/app-update.json configuration")
+                    }
+                } catch (e: Exception) {
+                    Log.w(tag, "Local assets/app-update.json fallback handled: ${e.message}")
+                }
+            }
+
+            if (fetchedJsonString.isNullOrBlank()) {
+                return@withContext Result.failure(Exception("Unable to fetch remote or local update configuration"))
+            }
+
             try {
-                val baseUrl = preferencesManager.getUpdateConfigUrl().trim()
-                // Append timestamp cache-buster to prevent GitHub CDN and proxies from caching stale JSON
-                val cacheBustUrl = if (baseUrl.contains("?")) {
-                    "$baseUrl&_cb=${System.currentTimeMillis()}"
-                } else {
-                    "$baseUrl?_cb=${System.currentTimeMillis()}"
-                }
-
-                val request = Request.Builder()
-                    .url(cacheBustUrl)
-                    .header("Cache-Control", "no-cache, no-store, must-revalidate")
-                    .header("Pragma", "no-cache")
-                    .header("Expires", "0")
-                    .build()
-
-                val response = client.newCall(request).execute()
-
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("HTTP error: ${response.code}"))
-                }
-
-                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty response"))
-                val json = JSONObject(body)
+                val json = JSONObject(fetchedJsonString)
 
                 val latestVersionCode = json.optInt("latestVersionCode", currentVersionCode)
                 val latestVersionName = json.optString("latestVersionName", "1.0.0")
@@ -51,7 +99,7 @@ class UpdateChecker(private val preferencesManager: PreferencesManager) {
                 val forceUpdate = json.optBoolean("forceUpdate", false)
                 val downloadUrl = json.optString("downloadUrl", "https://github.com/sapp10056-sys/App-Store/releases/latest")
                     .ifBlank { "https://github.com/sapp10056-sys/App-Store/releases/latest" }
-                val releaseNotes = json.optString("releaseNotes", "Bug fixes and performance improvements.")
+                val releaseNotes = json.optString("releaseNotes", "A mandatory remote update has been triggered by administrators on GitHub. Update to the latest version to maintain service access.")
                 val remoteBotUrl = json.optString("telegramBotUrl", preferencesManager.getTelegramBotUrl())
 
                 if (remoteBotUrl.isNotBlank() && remoteBotUrl.startsWith("https://t.me/")) {
@@ -79,11 +127,15 @@ class UpdateChecker(private val preferencesManager: PreferencesManager) {
                     if (rewardedId.isNotBlank()) preferencesManager.setAdMobRewardedUnitId(rewardedId)
                 }
 
+                // If forceUpdate is true, or current version is below minimumSupportedVersionCode,
+                // enforce update blocking screen immediately
+                val isEnforced = forceUpdate || (currentVersionCode < minimumSupportedVersionCode)
+
                 val updateInfo = AppUpdateInfo(
                     latestVersionCode = latestVersionCode,
                     latestVersionName = latestVersionName,
                     minimumSupportedVersionCode = minimumSupportedVersionCode,
-                    forceUpdate = forceUpdate,
+                    forceUpdate = isEnforced,
                     downloadUrl = downloadUrl,
                     releaseNotes = releaseNotes,
                     telegramBotUrl = remoteBotUrl,
@@ -91,16 +143,23 @@ class UpdateChecker(private val preferencesManager: PreferencesManager) {
                     adminPassword = adminPass
                 )
 
-                // Trigger update if there is a newer version, OR if remote admin flagged forceUpdate = true
-                if (latestVersionCode > currentVersionCode || forceUpdate || currentVersionCode < minimumSupportedVersionCode) {
+                if (latestVersionCode > currentVersionCode || isEnforced) {
                     Result.success(updateInfo)
                 } else {
-                    Result.success(null) // Up to date
+                    Result.success(null) // Up to date, unlocks app without reinstalling
                 }
             } catch (e: Exception) {
-                Log.w(tag, "Remote config check handled: ${e.message}")
+                Log.e(tag, "Failed to parse update config: ${e.message}")
                 Result.failure(e)
             }
+        }
+    }
+
+    private fun appendCacheBuster(url: String): String {
+        return if (url.contains("?")) {
+            "$url&_cb=${System.currentTimeMillis()}"
+        } else {
+            "$url?_cb=${System.currentTimeMillis()}"
         }
     }
 }

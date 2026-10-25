@@ -78,7 +78,7 @@ data class PublishFormState(
 class StoreViewModel(application: Application) : AndroidViewModel(application) {
     val preferencesManager = PreferencesManager(application)
     val repository = AppRepository(application)
-    private val updateChecker = UpdateChecker(preferencesManager)
+    private val updateChecker = UpdateChecker(application, preferencesManager)
 
     private val _currentScreen = MutableStateFlow<Screen>(
         if (preferencesManager.isDisclaimerAccepted()) Screen.Home else Screen.Disclaimer
@@ -158,7 +158,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     private fun startPeriodicUpdatePolling() {
         viewModelScope.launch {
             while (true) {
-                delay(15000L) // Poll remote GitHub JSON every 15 seconds to reflect changes live
+                delay(8000L) // Poll remote GitHub JSON every 8 seconds to reflect changes live
                 checkAppUpdates(silent = true)
             }
         }
