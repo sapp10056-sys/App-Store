@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.AppRepository
 import com.example.data.PreferencesManager
 import com.example.data.UpdateChecker
+import com.example.model.AdMobConfig
 import com.example.model.AppReport
 import com.example.model.AppUpdateInfo
 import com.example.model.ApplicationItem
@@ -107,6 +108,17 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     private val _isAdminLoggedIn = MutableStateFlow(preferencesManager.isAdminLoggedIn())
     val isAdminLoggedIn: StateFlow<Boolean> = _isAdminLoggedIn.asStateFlow()
 
+    private val _telegramBotUrl = MutableStateFlow(preferencesManager.getTelegramBotUrl())
+    val telegramBotUrl: StateFlow<String> = _telegramBotUrl.asStateFlow()
+
+    private val _admobConfig = MutableStateFlow(
+        AdMobConfig(
+            enabled = preferencesManager.isAdMobEnabled(),
+            bannerAdUnitId = preferencesManager.getAdMobBannerUnitId()
+        )
+    )
+    val admobConfig: StateFlow<AdMobConfig> = _admobConfig.asStateFlow()
+
     // Filtered applications stream based on search query and category
     val filteredApplications: StateFlow<List<ApplicationItem>> = combine(
         repository.applications,
@@ -139,6 +151,9 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun navigateTo(screen: Screen) {
         _currentScreen.value = screen
+        if (screen is Screen.Settings || screen is Screen.Publish || screen is Screen.Admin) {
+            checkAppUpdates()
+        }
     }
 
     fun openAppDetails(appId: String) {
@@ -192,13 +207,27 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     fun checkAppUpdates() {
         viewModelScope.launch {
             val result = updateChecker.checkForUpdate(currentVersionCode = 1)
+            _telegramBotUrl.value = preferencesManager.getTelegramBotUrl()
+            _admobConfig.value = AdMobConfig(
+                enabled = preferencesManager.isAdMobEnabled(),
+                bannerAdUnitId = preferencesManager.getAdMobBannerUnitId()
+            )
             result.onSuccess { info ->
                 _updateInfo.value = info
+                _telegramBotUrl.value = preferencesManager.getTelegramBotUrl()
+                _admobConfig.value = AdMobConfig(
+                    enabled = preferencesManager.isAdMobEnabled(),
+                    bannerAdUnitId = preferencesManager.getAdMobBannerUnitId()
+                )
             }
         }
     }
 
     fun dismissUpdateDialog() {
+        if (_updateInfo.value?.forceUpdate == true) {
+            // Cannot dismiss mandatory force update dialog
+            return
+        }
         _updateInfo.value = null
     }
 

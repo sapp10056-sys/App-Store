@@ -8,12 +8,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.example.security.SecurityIntegrityChecker
+import com.example.ui.components.AdMobBannerView
 import com.example.ui.components.BottomNavBar
 import com.example.ui.dialogs.DownloadConfirmDialog
 import com.example.ui.dialogs.ReportAppDialog
@@ -27,6 +29,7 @@ import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.Screen
 import com.example.viewmodel.StoreViewModel
+import com.google.android.gms.ads.MobileAds
 
 class MainActivity : ComponentActivity() {
     private val viewModel: StoreViewModel by viewModels()
@@ -35,6 +38,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Anti-tamper & anti-modding integrity verification: terminates process if modded
         SecurityIntegrityChecker.checkIntegrityOrCrash(this)
+        try {
+            MobileAds.initialize(this) {}
+        } catch (_: Exception) {}
         enableEdgeToEdge()
 
         setContent {
@@ -44,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 val pendingReport by viewModel.pendingReportApp.collectAsState()
                 val updateInfo by viewModel.updateInfo.collectAsState()
                 val apps by viewModel.repository.applications.collectAsState()
+                val admobConfig by viewModel.admobConfig.collectAsState()
 
                 if (currentScreen is Screen.Disclaimer) {
                     DisclaimerScreen(
@@ -53,11 +60,14 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         bottomBar = {
-                            if (currentScreen !is Screen.Details) {
-                                BottomNavBar(
-                                    currentScreen = currentScreen,
-                                    onNavigate = { screen -> viewModel.navigateTo(screen) }
-                                )
+                            Column {
+                                AdMobBannerView(config = admobConfig)
+                                if (currentScreen !is Screen.Details) {
+                                    BottomNavBar(
+                                        currentScreen = currentScreen,
+                                        onNavigate = { screen -> viewModel.navigateTo(screen) }
+                                    )
+                                }
                             }
                         }
                     ) { innerPadding ->

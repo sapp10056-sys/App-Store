@@ -54,6 +54,14 @@ class UpdateChecker(private val preferencesManager: PreferencesManager) {
                     preferencesManager.setAdminPassword(adminPass)
                 }
 
+                val admobObj = json.optJSONObject("admob")
+                if (admobObj != null) {
+                    val adEnabled = admobObj.optBoolean("enabled", preferencesManager.isAdMobEnabled())
+                    val bannerId = admobObj.optString("bannerAdUnitId", preferencesManager.getAdMobBannerUnitId())
+                    preferencesManager.setAdMobEnabled(adEnabled)
+                    if (bannerId.isNotBlank()) preferencesManager.setAdMobBannerUnitId(bannerId)
+                }
+
                 val updateInfo = AppUpdateInfo(
                     latestVersionCode = latestVersionCode,
                     latestVersionName = latestVersionName,
@@ -66,7 +74,8 @@ class UpdateChecker(private val preferencesManager: PreferencesManager) {
                     adminPassword = adminPass
                 )
 
-                if (latestVersionCode > currentVersionCode) {
+                // Trigger update if there is a newer version, OR if remote admin flagged forceUpdate = true
+                if (latestVersionCode > currentVersionCode || forceUpdate || currentVersionCode < minimumSupportedVersionCode) {
                     Result.success(updateInfo)
                 } else {
                     Result.success(null) // Up to date

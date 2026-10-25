@@ -100,7 +100,7 @@ fun PublishScreen(
 
     val context = LocalContext.current
     val form by viewModel.publishForm.collectAsState()
-    val telegramBotUrl = viewModel.preferencesManager.getTelegramBotUrl()
+    val telegramBotUrl by viewModel.telegramBotUrl.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 

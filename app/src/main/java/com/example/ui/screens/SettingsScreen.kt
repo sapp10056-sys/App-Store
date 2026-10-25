@@ -88,6 +88,7 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val isAdminLoggedIn by viewModel.isAdminLoggedIn.collectAsState()
+    val telegramBotUrl by viewModel.telegramBotUrl.collectAsState()
 
     var showDisclaimerDialog by remember { mutableStateOf(false) }
     var showAdminLoginDialog by remember { mutableStateOf(false) }
@@ -260,7 +261,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Official submission channel: ${viewModel.preferencesManager.getTelegramBotUrl()}",
+                        text = "Official submission channel: $telegramBotUrl",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -270,7 +271,7 @@ fun SettingsScreen(
                     Button(
                         onClick = {
                             try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(viewModel.preferencesManager.getTelegramBotUrl()))
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(telegramBotUrl))
                                 context.startActivity(intent)
                             } catch (_: Exception) {
                                 scope.launch {
