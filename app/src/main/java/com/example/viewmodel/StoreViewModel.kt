@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 sealed class Screen {
@@ -102,6 +103,9 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     private val _updateInfo = MutableStateFlow<AppUpdateInfo?>(null)
     val updateInfo: StateFlow<AppUpdateInfo?> = _updateInfo.asStateFlow()
 
+    private val _isCheckingUpdate = MutableStateFlow(false)
+    val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
+
     private val _publishForm = MutableStateFlow(PublishFormState())
     val publishForm: StateFlow<PublishFormState> = _publishForm.asStateFlow()
 
@@ -148,6 +152,16 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         checkAppUpdates()
+        startPeriodicUpdatePolling()
+    }
+
+    private fun startPeriodicUpdatePolling() {
+        viewModelScope.launch {
+            while (true) {
+                delay(15000L) // Poll remote GitHub JSON every 15 seconds to reflect changes live
+                checkAppUpdates(silent = true)
+            }
+        }
     }
 
     fun navigateTo(screen: Screen) {
@@ -217,23 +231,28 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun checkAppUpdates() {
+    fun checkAppUpdates(silent: Boolean = false) {
         viewModelScope.launch {
-            val result = updateChecker.checkForUpdate(currentVersionCode = 1)
-            _telegramBotUrl.value = preferencesManager.getTelegramBotUrl()
-            _admobConfig.value = AdMobConfig(
-                enabled = preferencesManager.isAdMobEnabled(),
-                bannerAdUnitId = preferencesManager.getAdMobBannerUnitId(),
-                rewardedAdUnitId = preferencesManager.getAdMobRewardedUnitId()
-            )
-            result.onSuccess { info ->
-                _updateInfo.value = info
+            if (!silent) _isCheckingUpdate.value = true
+            try {
+                val result = updateChecker.checkForUpdate(currentVersionCode = 1)
                 _telegramBotUrl.value = preferencesManager.getTelegramBotUrl()
                 _admobConfig.value = AdMobConfig(
                     enabled = preferencesManager.isAdMobEnabled(),
                     bannerAdUnitId = preferencesManager.getAdMobBannerUnitId(),
                     rewardedAdUnitId = preferencesManager.getAdMobRewardedUnitId()
                 )
+                result.onSuccess { info ->
+                    _updateInfo.value = info
+                    _telegramBotUrl.value = preferencesManager.getTelegramBotUrl()
+                    _admobConfig.value = AdMobConfig(
+                        enabled = preferencesManager.isAdMobEnabled(),
+                        bannerAdUnitId = preferencesManager.getAdMobBannerUnitId(),
+                        rewardedAdUnitId = preferencesManager.getAdMobRewardedUnitId()
+                    )
+                }
+            } finally {
+                if (!silent) _isCheckingUpdate.value = false
             }
         }
     }

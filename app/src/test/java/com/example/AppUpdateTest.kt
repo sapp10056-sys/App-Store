@@ -22,29 +22,38 @@ class AppUpdateTest {
     }
 
     @Test
-    fun testNoUpdateWhenVersionsMatch() {
-        val currentVersionCode = 2
+    fun testNoUpdateWhenVersionsMatchAndForceUpdateFalse() {
+        val currentVersionCode = 1
         val updateInfo = AppUpdateInfo(
-            latestVersionCode = 2,
-            latestVersionName = "1.1.0",
+            latestVersionCode = 1,
+            latestVersionName = "1.0.0",
             minimumSupportedVersionCode = 1,
             forceUpdate = false
         )
 
-        assertFalse(updateInfo.latestVersionCode > currentVersionCode)
+        val shouldTrigger = updateInfo.latestVersionCode > currentVersionCode ||
+                updateInfo.forceUpdate ||
+                currentVersionCode < updateInfo.minimumSupportedVersionCode
+
+        assertFalse(shouldTrigger)
     }
 
     @Test
-    fun testForceUpdateConditionTriggered() {
+    fun testForceUpdateImmediatelyTriggersEvenWhenVersionsMatch() {
         val currentVersionCode = 1
         val updateInfo = AppUpdateInfo(
-            latestVersionCode = 3,
-            latestVersionName = "2.0.0",
-            minimumSupportedVersionCode = 2,
+            latestVersionCode = 1,
+            latestVersionName = "1.0.0",
+            minimumSupportedVersionCode = 1,
             forceUpdate = true
         )
 
-        val isMandatory = updateInfo.forceUpdate && currentVersionCode < updateInfo.minimumSupportedVersionCode
-        assertTrue(isMandatory)
+        // Remote admin toggled forceUpdate: true in GitHub JSON
+        val shouldTrigger = updateInfo.latestVersionCode > currentVersionCode ||
+                updateInfo.forceUpdate ||
+                currentVersionCode < updateInfo.minimumSupportedVersionCode
+
+        assertTrue("When forceUpdate is true on GitHub, update must immediately trigger", shouldTrigger)
+        assertTrue(updateInfo.forceUpdate)
     }
 }

@@ -25,6 +25,7 @@ import com.example.ui.dialogs.UpdateDialog
 import com.example.ui.screens.AdminScreen
 import com.example.ui.screens.DetailScreen
 import com.example.ui.screens.DisclaimerScreen
+import com.example.ui.screens.ForceUpdateScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.PublishScreen
 import com.example.ui.screens.SettingsScreen
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
                 val pendingDownload by viewModel.pendingDownloadApp.collectAsState()
                 val pendingReport by viewModel.pendingReportApp.collectAsState()
                 val updateInfo by viewModel.updateInfo.collectAsState()
+                val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
                 val apps by viewModel.repository.applications.collectAsState()
                 val admobConfig by viewModel.admobConfig.collectAsState()
                 val rewardedAdManager = remember { RewardedAdManager(this@MainActivity) }
@@ -60,7 +62,21 @@ class MainActivity : ComponentActivity() {
                     rewardedAdManager.loadAd(admobConfig)
                 }
 
-                if (currentScreen is Screen.Disclaimer) {
+                if (updateInfo?.forceUpdate == true) {
+                    // Mandatory Force Update: immediately blocks entire app
+                    ForceUpdateScreen(
+                        updateInfo = updateInfo!!,
+                        isCheckingUpdate = isCheckingUpdate,
+                        onUpdateClick = { url ->
+                            if (url.isNotBlank()) {
+                                openExternalUrl(url)
+                            }
+                        },
+                        onRefreshStatus = {
+                            viewModel.checkAppUpdates(silent = false)
+                        }
+                    )
+                } else if (currentScreen is Screen.Disclaimer) {
                     DisclaimerScreen(
                         onAccept = { viewModel.acceptDisclaimer() }
                     )
@@ -150,21 +166,29 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Remote App Update Dialog
+                // Optional Remote App Update Dialog (shown when not forceUpdate)
                 updateInfo?.let { info ->
-                    UpdateDialog(
-                        updateInfo = info,
-                        onUpdateClick = { url ->
-                            viewModel.dismissUpdateDialog()
-                            if (url.isNotBlank()) {
-                                openExternalUrl(url)
-                            }
-                        },
-                        onDismiss = { viewModel.dismissUpdateDialog() }
-                    )
+                    if (!info.forceUpdate) {
+                        UpdateDialog(
+                            updateInfo = info,
+                            onUpdateClick = { url ->
+                                viewModel.dismissUpdateDialog()
+                                if (url.isNotBlank()) {
+                                    openExternalUrl(url)
+                                }
+                            },
+                            onDismiss = { viewModel.dismissUpdateDialog() }
+                        )
+                    }
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Automatically re-query GitHub JSON when returning to app to reflect true/false live
+        viewModel.checkAppUpdates(silent = true)
     }
 
     override fun onNewIntent(intent: Intent) {

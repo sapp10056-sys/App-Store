@@ -13,15 +13,29 @@ class UpdateChecker(private val preferencesManager: PreferencesManager) {
     private val tag = "UpdateChecker"
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(6, TimeUnit.SECONDS)
+        .cache(null)
         .build()
 
     suspend fun checkForUpdate(currentVersionCode: Int): Result<AppUpdateInfo?> {
         return withContext(Dispatchers.IO) {
             try {
-                val url = preferencesManager.getUpdateConfigUrl()
-                val request = Request.Builder().url(url).build()
+                val baseUrl = preferencesManager.getUpdateConfigUrl().trim()
+                // Append timestamp cache-buster to prevent GitHub CDN and proxies from caching stale JSON
+                val cacheBustUrl = if (baseUrl.contains("?")) {
+                    "$baseUrl&_cb=${System.currentTimeMillis()}"
+                } else {
+                    "$baseUrl?_cb=${System.currentTimeMillis()}"
+                }
+
+                val request = Request.Builder()
+                    .url(cacheBustUrl)
+                    .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                    .header("Pragma", "no-cache")
+                    .header("Expires", "0")
+                    .build()
+
                 val response = client.newCall(request).execute()
 
                 if (!response.isSuccessful) {
@@ -35,7 +49,8 @@ class UpdateChecker(private val preferencesManager: PreferencesManager) {
                 val latestVersionName = json.optString("latestVersionName", "1.0.0")
                 val minimumSupportedVersionCode = json.optInt("minimumSupportedVersionCode", 1)
                 val forceUpdate = json.optBoolean("forceUpdate", false)
-                val downloadUrl = json.optString("downloadUrl", "")
+                val downloadUrl = json.optString("downloadUrl", "https://github.com/sapp10056-sys/App-Store/releases/latest")
+                    .ifBlank { "https://github.com/sapp10056-sys/App-Store/releases/latest" }
                 val releaseNotes = json.optString("releaseNotes", "Bug fixes and performance improvements.")
                 val remoteBotUrl = json.optString("telegramBotUrl", preferencesManager.getTelegramBotUrl())
 
