@@ -17,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.example.security.SecurityIntegrityChecker
-import com.example.ui.components.AdMobBannerView
 import com.example.ui.components.BottomNavBar
 import com.example.ui.components.RewardedAdManager
 import com.example.ui.dialogs.DownloadConfirmDialog
@@ -44,6 +43,7 @@ class MainActivity : ComponentActivity() {
         try {
             MobileAds.initialize(this) {}
         } catch (_: Exception) {}
+        handleIntent(intent)
         enableEdgeToEdge()
 
         setContent {
@@ -68,14 +68,11 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         bottomBar = {
-                            Column {
-                                AdMobBannerView(config = admobConfig)
-                                if (currentScreen !is Screen.Details) {
-                                    BottomNavBar(
-                                        currentScreen = currentScreen,
-                                        onNavigate = { screen -> viewModel.navigateTo(screen) }
-                                    )
-                                }
+                            if (currentScreen !is Screen.Details) {
+                                BottomNavBar(
+                                    currentScreen = currentScreen,
+                                    onNavigate = { screen -> viewModel.navigateTo(screen) }
+                                )
                             }
                         }
                     ) { innerPadding ->
@@ -167,6 +164,30 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val data: Uri = intent?.data ?: return
+        val scheme = data.scheme
+        val host = data.host
+        val appId = when {
+            scheme == "novastore" && host == "app" -> {
+                data.pathSegments.firstOrNull() ?: data.lastPathSegment
+            }
+            scheme == "https" && host == "novastore.app" -> {
+                data.pathSegments.lastOrNull()
+            }
+            else -> null
+        }
+        if (!appId.isNullOrBlank()) {
+            viewModel.handleDeepLink(appId)
         }
     }
 

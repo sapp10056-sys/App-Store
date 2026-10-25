@@ -37,6 +37,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,6 +63,7 @@ import coil.request.ImageRequest
 import com.example.model.ApplicationItem
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.WarningAmber
+import com.example.util.AppShareHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +84,22 @@ fun DetailScreen(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Text("Application not found.")
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(24.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(36.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Loading application details...",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(onClick = onBack) {
+                    Text("Back to Store")
+                }
+            }
         }
         return
     }
@@ -104,18 +121,12 @@ fun DetailScreen(
                 },
                 actions = {
                     IconButton(
-                        onClick = {
-                            val sendIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, "Check out ${app.appName} on NovaStore!\nDownload: ${app.downloadUrl}")
-                                type = "text/plain"
-                            }
-                            context.startActivity(Intent.createChooser(sendIntent, "Share ${app.appName}"))
-                        }
+                        onClick = { AppShareHelper.shareApp(context, app) },
+                        modifier = Modifier.testTag("topbar_share_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
-                            contentDescription = "Share"
+                            contentDescription = "Share App"
                         )
                     }
                 },
@@ -260,28 +271,50 @@ fun DetailScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Primary Download CTA Button
-            Button(
-                onClick = { onDownloadClick(app) },
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .testTag("detail_download_button")
+            // Primary Download and Share Action Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Download APK (External)",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                )
+                Button(
+                    onClick = { onDownloadClick(app) },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp)
+                        .testTag("detail_download_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Download APK",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = { AppShareHelper.shareApp(context, app) },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .height(52.dp)
+                        .testTag("detail_share_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Share",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Share", fontWeight = FontWeight.Bold)
+                }
             }
 
             // Screenshots Gallery

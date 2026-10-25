@@ -92,11 +92,9 @@ fun SettingsScreen(
 
     var showDisclaimerDialog by remember { mutableStateOf(false) }
     var showAdminLoginDialog by remember { mutableStateOf(false) }
-    var showUpdateUrlEditDialog by remember { mutableStateOf(false) }
 
     var adminUserInput by remember { mutableStateOf("") }
     var adminPassInput by remember { mutableStateOf("") }
-    var updateUrlInput by remember { mutableStateOf(viewModel.preferencesManager.getUpdateConfigUrl()) }
 
     Scaffold(
         topBar = {
@@ -195,13 +193,34 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Configured endpoint: ${viewModel.preferencesManager.getUpdateConfigUrl().take(40)}...",
+                        text = "Configured endpoint: ${viewModel.preferencesManager.getUpdateConfigUrl().take(45)}...",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    TextButton(onClick = { showUpdateUrlEditDialog = true }) {
-                        Text("Edit Update Endpoint URL")
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Locked & Verified (Managed via GitHub remote)",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -493,37 +512,6 @@ The platform operator is not responsible for third-party application content or 
             },
             dismissButton = {
                 OutlinedButton(onClick = { showAdminLoginDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // Update URL Edit Dialog
-    if (showUpdateUrlEditDialog) {
-        AlertDialog(
-            onDismissRequest = { showUpdateUrlEditDialog = false },
-            title = { Text("Update Configuration Endpoint") },
-            text = {
-                OutlinedTextField(
-                    value = updateUrlInput,
-                    onValueChange = { updateUrlInput = it },
-                    label = { Text("Remote JSON URL") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                Button(onClick = {
-                    if (updateUrlInput.startsWith("https://")) {
-                        viewModel.preferencesManager.setUpdateConfigUrl(updateUrlInput.trim())
-                        showUpdateUrlEditDialog = false
-                    }
-                }) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showUpdateUrlEditDialog = false }) {
                     Text("Cancel")
                 }
             }

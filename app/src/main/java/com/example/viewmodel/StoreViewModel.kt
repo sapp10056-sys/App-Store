@@ -162,9 +162,21 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         _currentScreen.value = Screen.Details(appId)
     }
 
+    private var pendingDeepLinkScreen: Screen? = null
+
+    fun handleDeepLink(appId: String) {
+        if (!preferencesManager.isDisclaimerAccepted()) {
+            pendingDeepLinkScreen = Screen.Details(appId)
+        } else {
+            openAppDetails(appId)
+        }
+    }
+
     fun acceptDisclaimer() {
         preferencesManager.setDisclaimerAccepted(true)
-        _currentScreen.value = Screen.Home
+        val target = pendingDeepLinkScreen ?: Screen.Home
+        pendingDeepLinkScreen = null
+        _currentScreen.value = target
     }
 
     fun setSearchQuery(query: String) {

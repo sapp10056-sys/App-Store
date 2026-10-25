@@ -68,6 +68,7 @@ import com.example.ui.theme.VioletSecondaryDark
 import com.example.ui.theme.WarningAmber
 import com.example.viewmodel.Screen
 import com.example.viewmodel.StoreViewModel
+import com.example.util.AppShareHelper
 
 @Composable
 fun HomeScreen(
@@ -80,6 +81,7 @@ fun HomeScreen(
     val featuredApps by viewModel.featuredApplications.collectAsState()
     val trendingApps by viewModel.trendingApplications.collectAsState()
     val isLoading by viewModel.repository.isLoading.collectAsState()
+    val context = LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -337,6 +339,7 @@ fun HomeScreen(
                         app = app,
                         onClick = { viewModel.openAppDetails(app.appId) },
                         onDownloadClick = { viewModel.requestDownload(app) },
+                        onShareClick = { AppShareHelper.shareApp(context, app) },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                     )
                 }
