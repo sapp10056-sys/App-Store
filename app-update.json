@@ -5,13 +5,14 @@
   "forceUpdate": false,
   "downloadUrl": "https://github.com/sapp10056-sys/App-Store/releases/latest",
   "releaseNotes": "Initial production release of NovaStore with curated catalogs, direct downloads, and Telegram submission workflows.",
-  "telegramBotUrl": "https://t.me/SagarTech99",
+  "telegramBotUrl": "https://t.me/novastoreapk",
   "admin": {
     "username": "admin",
     "password": "admin1234"
   },
   "admob": {
     "enabled": true,
-    "bannerAdUnitId": "ca-app-pub-5220492832518267/6377280972"
+    "bannerAdUnitId": "ca-app-pub-5220492832518267/6377280972",
+    "rewardedAdUnitId": "ca-app-pub-5220492832518267/1149712866"
   }
 }

@@ -11,12 +11,15 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.example.security.SecurityIntegrityChecker
 import com.example.ui.components.AdMobBannerView
 import com.example.ui.components.BottomNavBar
+import com.example.ui.components.RewardedAdManager
 import com.example.ui.dialogs.DownloadConfirmDialog
 import com.example.ui.dialogs.ReportAppDialog
 import com.example.ui.dialogs.UpdateDialog
@@ -51,6 +54,11 @@ class MainActivity : ComponentActivity() {
                 val updateInfo by viewModel.updateInfo.collectAsState()
                 val apps by viewModel.repository.applications.collectAsState()
                 val admobConfig by viewModel.admobConfig.collectAsState()
+                val rewardedAdManager = remember { RewardedAdManager(this@MainActivity) }
+
+                LaunchedEffect(admobConfig) {
+                    rewardedAdManager.loadAd(admobConfig)
+                }
 
                 if (currentScreen is Screen.Disclaimer) {
                     DisclaimerScreen(
@@ -118,7 +126,16 @@ class MainActivity : ComponentActivity() {
                         app = app,
                         onConfirm = { url ->
                             viewModel.dismissDownloadDialog()
-                            openExternalUrl(url)
+                            rewardedAdManager.showRewardedAd(
+                                activity = this@MainActivity,
+                                config = admobConfig,
+                                onRewardEarned = {
+                                    Toast.makeText(this@MainActivity, "Sponsored ad completed. Starting download...", Toast.LENGTH_SHORT).show()
+                                },
+                                onAdClosed = {
+                                    openExternalUrl(url)
+                                }
+                            )
                         },
                         onDismiss = { viewModel.dismissDownloadDialog() }
                     )

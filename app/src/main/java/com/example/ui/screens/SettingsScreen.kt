@@ -255,13 +255,13 @@ fun SettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = CyanPrimaryLight)
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Official Telegram Submission Bot", fontWeight = FontWeight.Bold)
+                        Text("Official Telegram Group", fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Official submission channel: $telegramBotUrl",
+                        text = "Official group: $telegramBotUrl",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -285,7 +285,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Open Telegram Bot Channel")
+                        Text("Open Telegram Group")
                     }
                 }
             }

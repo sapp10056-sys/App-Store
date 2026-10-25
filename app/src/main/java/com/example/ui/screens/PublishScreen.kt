@@ -56,6 +56,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -160,11 +161,11 @@ fun PublishScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "How APK Submission Works",
+                                text = "Upload APK via Telegram Group",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                             )
                             Text(
-                                text = "2-Step submission via Telegram & DevUploads",
+                                text = "Join group, upload APK, and generate link",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -174,9 +175,9 @@ fun PublishScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "1. Send your APK file to the official Telegram Bot.\n" +
-                                "2. Platform operator uploads it to high-speed DevUploads.\n" +
-                                "3. Paste the generated DevUploads link and details below to publish instantly.",
+                        text = "1. Tap 'Upload APK in Telegram Group' below to open the group.\n" +
+                                "2. Upload your APK file in the group to generate your download link.\n" +
+                                "3. Paste the generated download link below to publish your app.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
@@ -199,11 +200,11 @@ fun PublishScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = CyanPrimaryLight),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("open_telegram_bot_button")
+                            .testTag("upload_apk_telegram_button")
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Open Telegram Bot (${telegramBotUrl.substringAfterLast("/")})", fontWeight = FontWeight.Bold)
+                        Text("Upload APK in Telegram Group (${telegramBotUrl.substringAfterLast("/")})", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -495,16 +496,39 @@ fun PublishScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 11. APK Download URL (DevUploads or verified HTTPS host)
+            // 11. APK Download URL (Telegram link / DevUploads / HTTPS)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "APK Download Link *",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                )
+                TextButton(
+                    onClick = {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(telegramBotUrl))
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
+                    }
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Upload on Telegram", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+
             OutlinedTextField(
                 value = form.downloadUrl,
                 onValueChange = { viewModel.updatePublishDownloadUrl(it) },
-                label = { Text("APK Download URL (DevUploads / HTTPS) *") },
-                placeholder = { Text("https://devuploads.com/...") },
+                label = { Text("Paste Download Link (Telegram / DevUploads / HTTPS)") },
+                placeholder = { Text("https://t.me/... or https://devuploads.com/...") },
                 isError = form.downloadUrl.isNotEmpty() && !form.isDownloadUrlValid,
                 supportingText = {
                     if (form.downloadUrl.isNotEmpty() && !form.isDownloadUrlValid) {
-                        Text("Must be a secure HTTPS link from DevUploads or supported host", color = MaterialTheme.colorScheme.error)
+                        Text("Must be a secure HTTPS link from Telegram, DevUploads, or direct host", color = MaterialTheme.colorScheme.error)
                     }
                 },
                 modifier = Modifier

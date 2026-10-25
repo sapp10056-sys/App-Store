@@ -58,8 +58,10 @@ class UpdateChecker(private val preferencesManager: PreferencesManager) {
                 if (admobObj != null) {
                     val adEnabled = admobObj.optBoolean("enabled", preferencesManager.isAdMobEnabled())
                     val bannerId = admobObj.optString("bannerAdUnitId", preferencesManager.getAdMobBannerUnitId())
+                    val rewardedId = admobObj.optString("rewardedAdUnitId", preferencesManager.getAdMobRewardedUnitId())
                     preferencesManager.setAdMobEnabled(adEnabled)
                     if (bannerId.isNotBlank()) preferencesManager.setAdMobBannerUnitId(bannerId)
+                    if (rewardedId.isNotBlank()) preferencesManager.setAdMobRewardedUnitId(rewardedId)
                 }
 
                 val updateInfo = AppUpdateInfo(

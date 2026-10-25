@@ -114,7 +114,8 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     private val _admobConfig = MutableStateFlow(
         AdMobConfig(
             enabled = preferencesManager.isAdMobEnabled(),
-            bannerAdUnitId = preferencesManager.getAdMobBannerUnitId()
+            bannerAdUnitId = preferencesManager.getAdMobBannerUnitId(),
+            rewardedAdUnitId = preferencesManager.getAdMobRewardedUnitId()
         )
     )
     val admobConfig: StateFlow<AdMobConfig> = _admobConfig.asStateFlow()
@@ -210,14 +211,16 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             _telegramBotUrl.value = preferencesManager.getTelegramBotUrl()
             _admobConfig.value = AdMobConfig(
                 enabled = preferencesManager.isAdMobEnabled(),
-                bannerAdUnitId = preferencesManager.getAdMobBannerUnitId()
+                bannerAdUnitId = preferencesManager.getAdMobBannerUnitId(),
+                rewardedAdUnitId = preferencesManager.getAdMobRewardedUnitId()
             )
             result.onSuccess { info ->
                 _updateInfo.value = info
                 _telegramBotUrl.value = preferencesManager.getTelegramBotUrl()
                 _admobConfig.value = AdMobConfig(
                     enabled = preferencesManager.isAdMobEnabled(),
-                    bannerAdUnitId = preferencesManager.getAdMobBannerUnitId()
+                    bannerAdUnitId = preferencesManager.getAdMobBannerUnitId(),
+                    rewardedAdUnitId = preferencesManager.getAdMobRewardedUnitId()
                 )
             }
         }
