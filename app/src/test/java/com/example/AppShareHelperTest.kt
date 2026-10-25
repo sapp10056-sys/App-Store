@@ -8,7 +8,7 @@ import org.junit.Test
 class AppShareHelperTest {
 
     @Test
-    fun testShareMessageContainsDeepLinkAndGitHubFallback() {
+    fun testShareMessageContainsNovaStoreApkDownloadLink() {
         val app = ApplicationItem(
             appId = "com.sample.testapp",
             appName = "SampleTestApp",
@@ -22,14 +22,19 @@ class AppShareHelperTest {
 
         val message = AppShareHelper.createShareMessage(app)
 
-        // Verifies the custom scheme deep link is present
-        assertTrue("Message should contain deep link", message.contains("novastore://app/com.sample.testapp"))
-
-        // Verifies the official GitHub APK fallback link is present for users without NovaStore
+        // Verifies the official GitHub NovaStore APK download URL is prominently featured so the recipient can download NovaStore
         assertTrue("Message should contain GitHub NovaStore APK download URL", message.contains(AppShareHelper.GITHUB_APK_DOWNLOAD_URL))
 
         // Verifies essential app details
         assertTrue("Message should contain app name", message.contains("SampleTestApp"))
         assertTrue("Message should contain version", message.contains("v2.1.0"))
+    }
+
+    @Test
+    fun testNovaStoreDirectApkShareMessage() {
+        val message = AppShareHelper.createNovaStoreShareMessage()
+
+        assertTrue("NovaStore share message must contain download link", message.contains(AppShareHelper.GITHUB_APK_DOWNLOAD_URL))
+        assertTrue("NovaStore share message must mention NovaStore", message.contains("NovaStore"))
     }
 }
