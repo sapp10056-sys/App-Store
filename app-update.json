@@ -5,7 +5,7 @@
   "forceUpdate": false,
   "downloadUrl": "https://github.com/YOUR_USERNAME/NovaStore/releases/latest",
   "releaseNotes": "Initial production release of NovaStore with curated catalogs, direct downloads, and Telegram submission workflows.",
-  "telegramBotUrl": "https://t.me/YOUR_BOT_USERNAME",
+  "telegramBotUrl": "https://t.me/SagarTech99",
   "admin": {
     "username": "admin",
     "password": "admin1234"
