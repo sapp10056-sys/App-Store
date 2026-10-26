@@ -103,6 +103,12 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     private val _updateInfo = MutableStateFlow<AppUpdateInfo?>(null)
     val updateInfo: StateFlow<AppUpdateInfo?> = _updateInfo.asStateFlow()
 
+    private val _updateSyncError = MutableStateFlow<String?>(null)
+    val updateSyncError: StateFlow<String?> = _updateSyncError.asStateFlow()
+
+    private val _isRemoteLive = MutableStateFlow(false)
+    val isRemoteLive: StateFlow<Boolean> = _isRemoteLive.asStateFlow()
+
     private val _isCheckingUpdate = MutableStateFlow(false)
     val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
 
@@ -236,6 +242,9 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             if (!silent) _isCheckingUpdate.value = true
             try {
                 val result = updateChecker.checkForUpdate(currentVersionCode = 1)
+                _isRemoteLive.value = updateChecker.isRemoteLive
+                _updateSyncError.value = updateChecker.lastSyncError
+
                 _telegramBotUrl.value = preferencesManager.getTelegramBotUrl()
                 _admobConfig.value = AdMobConfig(
                     enabled = preferencesManager.isAdMobEnabled(),
@@ -250,6 +259,8 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                         bannerAdUnitId = preferencesManager.getAdMobBannerUnitId(),
                         rewardedAdUnitId = preferencesManager.getAdMobRewardedUnitId()
                     )
+                }.onFailure { err ->
+                    _updateSyncError.value = err.message
                 }
             } finally {
                 if (!silent) _isCheckingUpdate.value = false

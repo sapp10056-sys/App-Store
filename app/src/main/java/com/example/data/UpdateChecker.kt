@@ -17,6 +17,10 @@ class UpdateChecker(
     constructor(preferencesManager: PreferencesManager) : this(null, preferencesManager)
 
     private val tag = "UpdateChecker"
+    var lastSyncError: String? = null
+        private set
+    var isRemoteLive: Boolean = false
+        private set
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
@@ -47,6 +51,7 @@ class UpdateChecker(
             }
 
             var fetchedJsonString: String? = null
+            var had404 = false
 
             for (url in candidateUrls) {
                 try {
@@ -65,12 +70,28 @@ class UpdateChecker(
                         val body = response.body?.string()
                         if (!body.isNullOrBlank()) {
                             fetchedJsonString = body
+                            isRemoteLive = true
+                            lastSyncError = null
                             Log.d(tag, "Successfully fetched live update config from: $url")
                             break
                         }
+                    } else if (response.code == 404) {
+                        had404 = true
                     }
                 } catch (e: Exception) {
                     Log.w(tag, "Candidate url attempt failed ($url): ${e.message}")
+                }
+            }
+
+            if (fetchedJsonString != null) {
+                isRemoteLive = true
+                lastSyncError = null
+            } else {
+                isRemoteLive = false
+                if (had404) {
+                    lastSyncError = "GitHub 404: Repository is PRIVATE! Make repo PUBLIC on GitHub to enable live sync."
+                } else {
+                    lastSyncError = "Network error: Unable to connect to remote GitHub endpoint."
                 }
             }
 
@@ -87,7 +108,8 @@ class UpdateChecker(
             }
 
             if (fetchedJsonString.isNullOrBlank()) {
-                return@withContext Result.failure(Exception("Unable to fetch remote or local update configuration"))
+                val error = lastSyncError ?: "Unable to fetch remote or local update configuration"
+                return@withContext Result.failure(Exception(error))
             }
 
             try {

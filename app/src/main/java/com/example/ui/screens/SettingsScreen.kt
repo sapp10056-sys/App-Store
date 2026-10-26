@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Info
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -91,6 +93,8 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val isAdminLoggedIn by viewModel.isAdminLoggedIn.collectAsState()
     val telegramBotUrl by viewModel.telegramBotUrl.collectAsState()
+    val updateSyncError by viewModel.updateSyncError.collectAsState()
+    val isRemoteLive by viewModel.isRemoteLive.collectAsState()
 
     var showDisclaimerDialog by remember { mutableStateOf(false) }
     var showAdminLoginDialog by remember { mutableStateOf(false) }
@@ -197,7 +201,13 @@ fun SettingsScreen(
                             onClick = {
                                 viewModel.checkAppUpdates()
                                 scope.launch {
-                                    snackbarHostState.showSnackbar("Remote configuration synchronized.")
+                                    kotlinx.coroutines.delay(600)
+                                    val err = viewModel.updateSyncError.value
+                                    if (err != null) {
+                                        snackbarHostState.showSnackbar(err)
+                                    } else {
+                                        snackbarHostState.showSnackbar("Connected to GitHub! Remote configuration synchronized.")
+                                    }
                                 }
                             },
                             shape = RoundedCornerShape(10.dp)
@@ -216,26 +226,82 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    if (updateSyncError != null) {
+                        Surface(
+                            color = ErrorRed.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Locked & Verified (Managed via GitHub remote)",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = ErrorRed,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "GitHub Sync Alert",
+                                        fontWeight = FontWeight.Bold,
+                                        color = ErrorRed,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = updateSyncError ?: "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                    } else if (isRemoteLive) {
+                        Surface(
+                            color = SuccessGreen.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = SuccessGreen,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Connected to GitHub (Live Remote Active)",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = SuccessGreen
+                                )
+                            }
+                        }
+                    } else {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Managed via GitHub remote (Auto-sync 8s)",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
