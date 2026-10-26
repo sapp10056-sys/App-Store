@@ -2,9 +2,9 @@
   "latestVersionCode": 1,
   "latestVersionName": "1.0.0",
   "minimumSupportedVersionCode": 1,
-  "forceUpdate": true,
+  "forceUpdate": false,
   "downloadUrl": "https://github.com/sapp10056-sys/App-Store/releases/latest",
-  "releaseNotes": "A mandatory remote update has been triggered by administrators on GitHub. Update to the latest version to maintain service access.",
+  "releaseNotes": "Initial production release of NovaStore with curated catalogs, direct downloads, and Telegram submission workflows.",
   "telegramBotUrl": "https://t.me/novastoreapk",
   "admin": {
     "username": "admin",
