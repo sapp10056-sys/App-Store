@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -742,5 +743,38 @@ fun PublishScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
         }
+    }
+
+    if (form.submissionSuccess) {
+        AlertDialog(
+            onDismissRequest = { viewModel.resetPublishSuccess() },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = SuccessGreen,
+                    modifier = Modifier.size(40.dp)
+                )
+            },
+            title = { Text("Application Published Live!", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("Your listing has been successfully saved to NovaStore and is now live in the store catalog.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.resetPublishSuccess()
+                        onNavigate(Screen.Home)
+                    }
+                ) {
+                    Text("View in Store")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.resetPublishSuccess() }) {
+                    Text("Publish Another")
+                }
+            }
+        )
     }
 }

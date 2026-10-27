@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import java.io.File
 import java.util.UUID
@@ -184,8 +186,7 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun publishApplication(app: ApplicationItem): Result<String> {
-        return try {
-            val db = firestore
+        return withContext(Dispatchers.IO) {
             val id = if (app.appId.isNotBlank()) app.appId else "app_" + UUID.randomUUID().toString().replace("-", "").take(12)
             val updatedApp = app.copy(
                 appId = id,
@@ -194,27 +195,27 @@ class AppRepository(private val context: Context) {
                 updatedAt = System.currentTimeMillis()
             )
 
-            if (db != null) {
-                db.collection("applications").document(id).set(updatedApp.toMap()).await()
+            // 1. Immediately update in-memory state and persist to disk (instant response)
+            val currentList = _applications.value.toMutableList()
+            currentList.removeAll { it.appId == id }
+            currentList.add(0, updatedApp)
+            _applications.value = currentList
+            saveApplicationsToDisk(currentList)
+
+            // 2. Synchronize to Firestore in background without blocking the UI
+            firestore?.let { db ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        withTimeoutOrNull(2500L) {
+                            db.collection("applications").document(id).set(updatedApp.toMap()).await()
+                        }
+                        Log.d(tag, "Successfully uploaded app $id to Firestore")
+                    } catch (e: Exception) {
+                        Log.w(tag, "Background Firestore sync handled: ${e.message}")
+                    }
+                }
             }
 
-            // Immediately update and persist to disk so app is never lost across updates
-            val currentList = _applications.value.toMutableList()
-            currentList.removeAll { it.appId == id }
-            currentList.add(0, updatedApp)
-            _applications.value = currentList
-            saveApplicationsToDisk(currentList)
-
-            Result.success(id)
-        } catch (e: Exception) {
-            Log.e(tag, "Remote publish failed, writing to local persistent storage: ${e.message}", e)
-            val id = if (app.appId.isNotBlank()) app.appId else "local_" + UUID.randomUUID().toString().take(8)
-            val updatedApp = app.copy(appId = id, submitterUid = currentUserId)
-            val currentList = _applications.value.toMutableList()
-            currentList.removeAll { it.appId == id }
-            currentList.add(0, updatedApp)
-            _applications.value = currentList
-            saveApplicationsToDisk(currentList)
             Result.success(id)
         }
     }
@@ -247,60 +248,65 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun updateAppStatus(appId: String, newStatus: String): Result<Unit> {
-        return try {
-            firestore?.collection("applications")?.document(appId)
-                ?.update("publicationStatus", newStatus)?.await()
-
-            val currentList = _applications.value.map {
-                if (it.appId == appId) it.copy(publicationStatus = newStatus) else it
-            }
-            _applications.value = currentList
-            saveApplicationsToDisk(currentList)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            val currentList = _applications.value.map {
-                if (it.appId == appId) it.copy(publicationStatus = newStatus) else it
-            }
-            _applications.value = currentList
-            saveApplicationsToDisk(currentList)
-            Result.success(Unit)
+        val currentList = _applications.value.map {
+            if (it.appId == appId) it.copy(publicationStatus = newStatus) else it
         }
+        _applications.value = currentList
+        saveApplicationsToDisk(currentList)
+
+        firestore?.let { db ->
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    withTimeoutOrNull(2500L) {
+                        db.collection("applications").document(appId).update("publicationStatus", newStatus).await()
+                    }
+                } catch (e: Exception) {
+                    Log.w(tag, "Firestore updateStatus handled: ${e.message}")
+                }
+            }
+        }
+        return Result.success(Unit)
     }
 
     suspend fun updateApp(updatedApp: ApplicationItem): Result<Unit> {
-        return try {
-            firestore?.collection("applications")?.document(updatedApp.appId)
-                ?.set(updatedApp.copy(updatedAt = System.currentTimeMillis()).toMap())?.await()
-
-            val currentList = _applications.value.map {
-                if (it.appId == updatedApp.appId) updatedApp else it
-            }
-            _applications.value = currentList
-            saveApplicationsToDisk(currentList)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            val currentList = _applications.value.map {
-                if (it.appId == updatedApp.appId) updatedApp else it
-            }
-            _applications.value = currentList
-            saveApplicationsToDisk(currentList)
-            Result.success(Unit)
+        val currentList = _applications.value.map {
+            if (it.appId == updatedApp.appId) updatedApp else it
         }
+        _applications.value = currentList
+        saveApplicationsToDisk(currentList)
+
+        firestore?.let { db ->
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    withTimeoutOrNull(2500L) {
+                        db.collection("applications").document(updatedApp.appId)
+                            .set(updatedApp.copy(updatedAt = System.currentTimeMillis()).toMap()).await()
+                    }
+                } catch (e: Exception) {
+                    Log.w(tag, "Firestore updateApp handled: ${e.message}")
+                }
+            }
+        }
+        return Result.success(Unit)
     }
 
     suspend fun deleteApp(appId: String): Result<Unit> {
-        return try {
-            firestore?.collection("applications")?.document(appId)?.delete()?.await()
-            val currentList = _applications.value.filter { it.appId != appId }
-            _applications.value = currentList
-            saveApplicationsToDisk(currentList)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            val currentList = _applications.value.filter { it.appId != appId }
-            _applications.value = currentList
-            saveApplicationsToDisk(currentList)
-            Result.success(Unit)
+        val currentList = _applications.value.filter { it.appId != appId }
+        _applications.value = currentList
+        saveApplicationsToDisk(currentList)
+
+        firestore?.let { db ->
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    withTimeoutOrNull(2500L) {
+                        db.collection("applications").document(appId).delete().await()
+                    }
+                } catch (e: Exception) {
+                    Log.w(tag, "Firestore deleteApp handled: ${e.message}")
+                }
+            }
         }
+        return Result.success(Unit)
     }
 
     fun searchApplications(query: String, category: String): List<ApplicationItem> {

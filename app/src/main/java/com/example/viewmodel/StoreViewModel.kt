@@ -52,14 +52,14 @@ data class PublishFormState(
 ) {
     val isAppNameValid: Boolean get() = appName.trim().length >= 2
     val isDevNameValid: Boolean get() = developerName.trim().length >= 2
-    val isLogoUrlValid: Boolean get() = logoUrl.startsWith("https://", ignoreCase = true) && logoUrl.length >= 10
-    val isShortDescValid: Boolean get() = shortDescription.trim().length in 10..150
-    val isFullDescValid: Boolean get() = fullDescription.trim().length >= 20
+    val isLogoUrlValid: Boolean get() = logoUrl.isBlank() || logoUrl.trim().length >= 6
+    val isShortDescValid: Boolean get() = shortDescription.trim().length in 3..150
+    val isFullDescValid: Boolean get() = fullDescription.trim().length >= 5
     val isVersionNameValid: Boolean get() = versionName.trim().isNotEmpty()
     val isVersionCodeValid: Boolean get() = (versionCode.toLongOrNull() ?: 0L) > 0L
-    val isDownloadUrlValid: Boolean get() = downloadUrl.startsWith("https://", ignoreCase = true) && downloadUrl.length >= 10
-    val isSupportValid: Boolean get() = supportUrl.trim().length >= 4
-    val isPermissionsValid: Boolean get() = permissionsDisclosure.trim().length >= 5
+    val isDownloadUrlValid: Boolean get() = (downloadUrl.startsWith("https://", ignoreCase = true) || downloadUrl.startsWith("t.me/", ignoreCase = true)) && downloadUrl.trim().length >= 8
+    val isSupportValid: Boolean get() = supportUrl.trim().length >= 3
+    val isPermissionsValid: Boolean get() = permissionsDisclosure.trim().length >= 3
     val areCheckboxesChecked: Boolean get() = hasDistributionRights && isInfoAccurate && agreesToRules
 
     val isFormValid: Boolean get() = isAppNameValid &&
@@ -349,18 +349,32 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
         _publishForm.value = form.copy(isSubmitting = true, submissionError = null)
         viewModelScope.launch {
+            val normalizedDownload = when {
+                form.downloadUrl.trim().startsWith("http://", ignoreCase = true) ||
+                form.downloadUrl.trim().startsWith("https://", ignoreCase = true) -> form.downloadUrl.trim()
+                form.downloadUrl.trim().isNotEmpty() -> "https://" + form.downloadUrl.trim()
+                else -> "https://t.me/novastoreapk"
+            }
+
+            val normalizedLogo = when {
+                form.logoUrl.trim().startsWith("http://", ignoreCase = true) ||
+                form.logoUrl.trim().startsWith("https://", ignoreCase = true) -> form.logoUrl.trim()
+                form.logoUrl.trim().isNotEmpty() -> "https://" + form.logoUrl.trim()
+                else -> "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=256&auto=format&fit=crop&q=80"
+            }
+
             val app = ApplicationItem(
                 appName = form.appName.trim(),
                 developerName = form.developerName.trim(),
                 developerEmail = "",
-                logoUrl = form.logoUrl.trim(),
+                logoUrl = normalizedLogo,
                 shortDescription = form.shortDescription.trim(),
                 fullDescription = form.fullDescription.trim(),
                 category = form.category,
                 versionName = form.versionName.trim(),
                 versionCode = form.versionCode.toLongOrNull() ?: 1L,
                 minAndroidVersion = form.minAndroidVersion,
-                downloadUrl = form.downloadUrl.trim(),
+                downloadUrl = normalizedDownload,
                 privacyPolicyUrl = "",
                 supportUrl = form.supportUrl.trim(),
                 permissionsDisclosure = form.permissionsDisclosure.trim(),
