@@ -25,14 +25,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Support
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -49,9 +52,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -61,9 +66,15 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.model.ApplicationItem
+import com.example.model.DeveloperAccount
+import com.example.ui.theme.CyanPrimaryLight
 import com.example.ui.theme.ErrorRed
+import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.WarningAmber
 import com.example.util.AppShareHelper
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +82,9 @@ fun DetailScreen(
     app: ApplicationItem?,
     onBack: () -> Unit,
     onDownloadClick: (ApplicationItem) -> Unit,
-    onReportClick: (ApplicationItem) -> Unit
+    onReportClick: (ApplicationItem) -> Unit,
+    onUpdateClick: ((ApplicationItem) -> Unit)? = null,
+    currentDeveloper: DeveloperAccount? = null
 ) {
     BackHandler {
         onBack()
@@ -177,11 +190,28 @@ fun DetailScreen(
                         color = MaterialTheme.colorScheme.onBackground
                     )
 
-                    Text(
-                        text = app.developerName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = app.developerName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (app.developerId.isNotBlank()) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(
+                                    text = "@${app.developerId}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(4.dp))
 
@@ -262,10 +292,51 @@ fun DetailScreen(
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "APK",
+                        text = "${app.getAllVersions().size}",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
-                    Text("Format", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Releases", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            // Owner Developer Management Banner
+            val isOwner = currentDeveloper != null && (app.developerId.isBlank() || app.developerId.equals(currentDeveloper.developerId, ignoreCase = true))
+            if (isOwner && onUpdateClick != null) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = CyanPrimaryLight.copy(alpha = 0.15f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = CyanPrimaryLight)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("You Own This App", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Text("Add a new APK version or edit details", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+
+                        Button(
+                            onClick = { onUpdateClick(app) },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("New Version", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
                 }
             }
 
@@ -295,8 +366,8 @@ fun DetailScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Download APK",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        text = "Download Latest APK (v${app.versionName})",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
                 }
 
@@ -364,6 +435,147 @@ fun DetailScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 22.sp
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // All Versions / Version History (Uptodown & APKPure Style)
+            val allVersions = app.getAllVersions()
+            val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("version_history_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "All Versions (${allVersions.size})",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "Version History",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    allVersions.forEachIndexed { index, ver ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (index == 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                )
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "v${ver.versionName}",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (index == 0) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = SuccessGreen
+                                        ) {
+                                            Text(
+                                                text = "Latest",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.White,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Button(
+                                    onClick = {
+                                        onDownloadClick(
+                                            app.copy(
+                                                versionName = ver.versionName,
+                                                versionCode = ver.versionCode,
+                                                downloadUrl = ver.downloadUrl
+                                            )
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Download", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Build ${ver.versionCode} • ${dateFormat.format(Date(ver.releaseDate))}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            if (ver.changelog.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = ver.changelog,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        if (index < allVersions.size - 1) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 

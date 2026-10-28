@@ -4,6 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.example.model.AppReport
 import com.example.model.ApplicationItem
+import com.example.model.AppVersionItem
+import com.example.model.DeveloperAccount
+import com.example.util.DeveloperSessionManager
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -19,13 +22,30 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 class AppRepository(private val context: Context) {
     private val tag = "AppRepository"
     private val diskFile = File(context.filesDir, "persisted_apps.json")
+    val developerSessionManager = DeveloperSessionManager(context)
+
+    private val rtdbBaseUrl = "https://app-store-a9559-default-rtdb.asia-southeast1.firebasedatabase.app"
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .build()
 
     private val _applications = MutableStateFlow<List<ApplicationItem>>(emptyList())
     val applications: StateFlow<List<ApplicationItem>> = _applications.asStateFlow()
@@ -191,6 +211,88 @@ class AppRepository(private val context: Context) {
         }
     }
 
+    private fun syncToRealtimeDatabase(app: ApplicationItem) {
+        try {
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val body = app.toJson().toString().toRequestBody(mediaType)
+            val request = Request.Builder()
+                .url("$rtdbBaseUrl/applications/${app.appId}.json")
+                .put(body)
+                .build()
+            httpClient.newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    Log.d(tag, "RTDB background sync notice: ${e.message}")
+                }
+                override fun onResponse(call: Call, response: Response) {
+                    response.close()
+                }
+            })
+        } catch (e: Exception) {
+            Log.d(tag, "RTDB sync exception: ${e.message}")
+        }
+    }
+
+    private fun deleteFromRealtimeDatabase(appId: String) {
+        try {
+            val request = Request.Builder()
+                .url("$rtdbBaseUrl/applications/$appId.json")
+                .delete()
+                .build()
+            httpClient.newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {}
+                override fun onResponse(call: Call, response: Response) { response.close() }
+            })
+        } catch (_: Exception) {}
+    }
+
+    fun syncDeveloperToCloud(account: DeveloperAccount) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                firestore?.collection("developers")?.document(account.developerId)?.set(account.toMap())?.await()
+            } catch (_: Exception) {}
+            try {
+                val mediaType = "application/json; charset=utf-8".toMediaType()
+                val body = account.toJson().toString().toRequestBody(mediaType)
+                val request = Request.Builder()
+                    .url("$rtdbBaseUrl/developers/${account.developerId}.json")
+                    .put(body)
+                    .build()
+                httpClient.newCall(request).execute().close()
+            } catch (_: Exception) {}
+        }
+    }
+
+    suspend fun registerDeveloper(devId: String, devName: String, pass: String, contact: String): Result<DeveloperAccount> {
+        val result = developerSessionManager.registerDeveloper(devId, devName, pass, contact)
+        result.onSuccess { account ->
+            syncDeveloperToCloud(account)
+        }
+        return result
+    }
+
+    suspend fun loginDeveloper(devId: String, pass: String): Result<DeveloperAccount> {
+        val localResult = developerSessionManager.loginDeveloper(devId, pass)
+        if (localResult.isSuccess) {
+            return localResult
+        }
+
+        // Fallback: Check cloud Firestore if account was registered on another device
+        return withContext(Dispatchers.IO) {
+            try {
+                val cleanId = devId.trim().lowercase().replace(" ", "_")
+                val doc = firestore?.collection("developers")?.document(cleanId)?.get()?.await()
+                if (doc != null && doc.exists()) {
+                    val cloudAccount = DeveloperAccount.fromMap(doc.id, doc.data ?: emptyMap())
+                    developerSessionManager.mergeCloudAccounts(listOf(cloudAccount))
+                    return@withContext developerSessionManager.loginDeveloper(devId, pass)
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "Cloud dev login fallback note: ${e.message}")
+            }
+            Result.failure(IllegalArgumentException("Invalid Developer ID or Password."))
+        }
+    }
+
     suspend fun refreshCatalog() {
         withContext(Dispatchers.IO) {
             try {
@@ -212,33 +314,129 @@ class AppRepository(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
-                Log.w(tag, "Manual catalog refresh note: ${e.message}")
+                Log.w(tag, "Firestore catalog refresh note: ${e.message}")
+            }
+
+            // Also attempt merge from Realtime Database REST API if accessible
+            try {
+                val req = Request.Builder().url("$rtdbBaseUrl/applications.json").get().build()
+                val resp = httpClient.newCall(req).execute()
+                val body = resp.body?.string()
+                resp.close()
+                if (!body.isNullOrBlank() && !body.startsWith("{\"error\"")) {
+                    val obj = JSONObject(body)
+                    val keys = obj.keys()
+                    val rtdbApps = mutableListOf<ApplicationItem>()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val itemJson = obj.optJSONObject(key)
+                        if (itemJson != null) {
+                            rtdbApps.add(ApplicationItem.fromJson(itemJson))
+                        }
+                    }
+                    if (rtdbApps.isNotEmpty()) {
+                        val currentMap = _applications.value.associateBy { it.appId }.toMutableMap()
+                        rtdbApps.forEach { currentMap[it.appId] = it }
+                        val merged = currentMap.values.sortedByDescending { it.createdAt }
+                        _applications.value = merged
+                        saveApplicationsToDisk(merged)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "RTDB catalog read note: ${e.message}")
             }
         }
     }
 
-    suspend fun publishApplication(app: ApplicationItem): Result<String> {
+    suspend fun publishApplication(
+        app: ApplicationItem,
+        actingDeveloper: DeveloperAccount? = developerSessionManager.currentDeveloper.value
+    ): Result<String> {
         return withContext(Dispatchers.IO) {
-            // Check if app with same name or same ID already exists to update it!
+            // Check if app with same name or same ID already exists!
             val existing = _applications.value.find {
                 (app.appId.isNotBlank() && it.appId == app.appId) ||
                 it.appName.equals(app.appName, ignoreCase = true)
             }
 
-            val id = existing?.appId ?: if (app.appId.isNotBlank()) app.appId else "app_" + UUID.randomUUID().toString().replace("-", "").take(12)
-            val updatedApp = app.copy(
-                appId = id,
-                submitterUid = if (existing?.submitterUid.isNullOrBlank()) currentUserId else existing!!.submitterUid,
-                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis(),
-                rating = existing?.rating ?: app.rating,
-                downloadCount = existing?.downloadCount ?: app.downloadCount,
-                publicationStatus = "published"
-            )
+            val updatedApp: ApplicationItem
+
+            if (existing != null) {
+                // ACCESS CONTROL: Developer A's ID/Password CANNOT edit Developer B's app!
+                if (existing.developerId.isNotBlank()) {
+                    if (actingDeveloper == null) {
+                        return@withContext Result.failure(
+                            IllegalAccessException("App '${existing.appName}' is registered by Developer @${existing.developerId}. Please log in with Developer ID and Password to update this app.")
+                        )
+                    }
+                    if (!existing.developerId.equals(actingDeveloper.developerId, ignoreCase = true)) {
+                        return@withContext Result.failure(
+                            IllegalAccessException("Access Denied: App '${existing.appName}' belongs to Developer @${existing.developerId}. You are logged in as @${actingDeveloper.developerId}. You can only edit your own apps!")
+                        )
+                    }
+                }
+
+                // MULTI-VERSION SUPPORT (Uptodown / APKPure style):
+                // If updating an existing app, append the new version to versions list!
+                val newVersion = AppVersionItem(
+                    versionName = app.versionName.ifBlank { "1.0.1" },
+                    versionCode = if (app.versionCode > 0L) app.versionCode else (existing.versionCode + 1),
+                    downloadUrl = app.downloadUrl,
+                    releaseDate = System.currentTimeMillis(),
+                    changelog = if (app.shortDescription.isNotBlank()) app.shortDescription else "Version update",
+                    apkSize = "Auto"
+                )
+
+                val mergedVersions = (existing.getAllVersions().filter { it.versionCode != newVersion.versionCode } + newVersion)
+                    .sortedByDescending { it.versionCode }
+
+                updatedApp = existing.copy(
+                    appName = app.appName.ifBlank { existing.appName },
+                    developerId = if (existing.developerId.isNotBlank()) existing.developerId else (actingDeveloper?.developerId ?: ""),
+                    developerName = if (actingDeveloper != null) actingDeveloper.developerName else (app.developerName.ifBlank { existing.developerName }),
+                    logoUrl = app.logoUrl.ifBlank { existing.logoUrl },
+                    shortDescription = app.shortDescription.ifBlank { existing.shortDescription },
+                    fullDescription = app.fullDescription.ifBlank { existing.fullDescription },
+                    category = app.category,
+                    versionName = newVersion.versionName,
+                    versionCode = newVersion.versionCode,
+                    downloadUrl = app.downloadUrl,
+                    screenshotUrls = if (app.screenshotUrls.isNotEmpty()) app.screenshotUrls else existing.screenshotUrls,
+                    versions = mergedVersions,
+                    updatedAt = System.currentTimeMillis(),
+                    publicationStatus = "published"
+                )
+            } else {
+                // BRAND NEW APP
+                val id = if (app.appId.isNotBlank()) app.appId else "app_" + UUID.randomUUID().toString().replace("-", "").take(12)
+                val initialVersion = AppVersionItem(
+                    versionName = app.versionName.ifBlank { "1.0.0" },
+                    versionCode = if (app.versionCode > 0L) app.versionCode else 1L,
+                    downloadUrl = app.downloadUrl,
+                    releaseDate = System.currentTimeMillis(),
+                    changelog = "Initial release",
+                    apkSize = "Auto"
+                )
+
+                updatedApp = app.copy(
+                    appId = id,
+                    developerId = actingDeveloper?.developerId ?: "community_dev",
+                    developerName = actingDeveloper?.developerName ?: app.developerName.ifBlank { "Verified Developer" },
+                    submitterUid = actingDeveloper?.developerId ?: currentUserId,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis(),
+                    rating = 4.8f,
+                    downloadCount = 120L,
+                    versions = listOf(initialVersion),
+                    publicationStatus = "published"
+                )
+            }
+
+            val targetId = updatedApp.appId
 
             // 1. Immediately update in-memory state and persist to disk (instant response)
             val currentList = _applications.value.toMutableList()
-            currentList.removeAll { it.appId == id }
+            currentList.removeAll { it.appId == targetId }
             currentList.add(0, updatedApp)
             _applications.value = currentList
             saveApplicationsToDisk(currentList)
@@ -247,15 +445,18 @@ class AppRepository(private val context: Context) {
             firestore?.let { db ->
                 try {
                     withTimeoutOrNull(6000L) {
-                        db.collection("applications").document(id).set(updatedApp.toMap()).await()
+                        db.collection("applications").document(targetId).set(updatedApp.toMap()).await()
                     }
-                    Log.d(tag, "Successfully uploaded app $id to shared Firestore catalog")
+                    Log.d(tag, "Successfully uploaded app $targetId to shared Firestore catalog")
                 } catch (e: Exception) {
                     Log.w(tag, "Firestore publish sync note: ${e.message}")
                 }
             }
 
-            Result.success(id)
+            // 3. Dual sync to Realtime Database
+            syncToRealtimeDatabase(updatedApp)
+
+            Result.success(targetId)
         }
     }
 
@@ -325,6 +526,7 @@ class AppRepository(private val context: Context) {
                     Log.w(tag, "Firestore updateApp handled: ${e.message}")
                 }
             }
+            syncToRealtimeDatabase(updatedApp)
             Result.success(Unit)
         }
     }
@@ -344,6 +546,7 @@ class AppRepository(private val context: Context) {
                     Log.w(tag, "Firestore deleteApp handled: ${e.message}")
                 }
             }
+            deleteFromRealtimeDatabase(appId)
             Result.success(Unit)
         }
     }

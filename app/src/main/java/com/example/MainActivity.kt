@@ -101,11 +101,14 @@ class MainActivity : ComponentActivity() {
                             }
                             is Screen.Details -> {
                                 val app = apps.find { it.appId == screen.appId }
+                                val activeDev by viewModel.currentDeveloper.collectAsState()
                                 DetailScreen(
                                     app = app,
                                     onBack = { viewModel.navigateTo(Screen.Home) },
                                     onDownloadClick = { targetApp -> viewModel.requestDownload(targetApp) },
-                                    onReportClick = { targetApp -> viewModel.requestReport(targetApp) }
+                                    onReportClick = { targetApp -> viewModel.requestReport(targetApp) },
+                                    onUpdateClick = { targetApp -> viewModel.prefillForAppUpdate(targetApp) },
+                                    currentDeveloper = activeDev
                                 )
                             }
                             is Screen.Publish -> {

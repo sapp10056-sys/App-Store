@@ -5,12 +5,16 @@ import org.json.JSONObject
 
 /**
  * Model representing an application listed on NovaStore.
+ * Supports developer ownership verification (developerId) and
+ * multiple version releases (versions list, Uptodown / APKPure style).
  */
 data class ApplicationItem(
     val appId: String = "",
     val appName: String = "",
+    val developerId: String = "",
     val developerName: String = "",
     val developerEmail: String = "",
+    val developerPasswordHash: String = "",
     val logoUrl: String = "",
     val shortDescription: String = "",
     val fullDescription: String = "",
@@ -31,14 +35,36 @@ data class ApplicationItem(
     val rating: Float = 4.8f,
     val downloadCount: Long = 1200L,
     val isFeatured: Boolean = false,
-    val isTrending: Boolean = false
+    val isTrending: Boolean = false,
+    val versions: List<AppVersionItem> = emptyList()
 ) {
+    /**
+     * Returns all versions for this app, ensuring at least the current version is present.
+     */
+    fun getAllVersions(): List<AppVersionItem> {
+        if (versions.isNotEmpty()) {
+            return versions.sortedByDescending { it.versionCode }
+        }
+        return listOf(
+            AppVersionItem(
+                versionName = versionName.ifBlank { "1.0.0" },
+                versionCode = versionCode,
+                downloadUrl = downloadUrl,
+                releaseDate = updatedAt,
+                changelog = "Initial release"
+            )
+        )
+    }
+
     fun toMap(): Map<String, Any> {
+        val versionsList = getAllVersions().map { it.toMap() }
         return mapOf(
             "appId" to appId,
             "appName" to appName,
+            "developerId" to developerId,
             "developerName" to developerName,
             "developerEmail" to developerEmail,
+            "developerPasswordHash" to developerPasswordHash,
             "logoUrl" to logoUrl,
             "shortDescription" to shortDescription,
             "fullDescription" to fullDescription,
@@ -59,7 +85,8 @@ data class ApplicationItem(
             "rating" to rating.toDouble(),
             "downloadCount" to downloadCount,
             "isFeatured" to isFeatured,
-            "isTrending" to isTrending
+            "isTrending" to isTrending,
+            "versions" to versionsList
         )
     }
 
@@ -67,8 +94,10 @@ data class ApplicationItem(
         val json = JSONObject()
         json.put("appId", appId)
         json.put("appName", appName)
+        json.put("developerId", developerId)
         json.put("developerName", developerName)
         json.put("developerEmail", developerEmail)
+        json.put("developerPasswordHash", developerPasswordHash)
         json.put("logoUrl", logoUrl)
         json.put("shortDescription", shortDescription)
         json.put("fullDescription", fullDescription)
@@ -80,9 +109,11 @@ data class ApplicationItem(
         json.put("privacyPolicyUrl", privacyPolicyUrl)
         json.put("supportUrl", supportUrl)
         json.put("permissionsDisclosure", permissionsDisclosure)
+
         val arr = JSONArray()
         screenshotUrls.forEach { arr.put(it) }
         json.put("screenshotUrls", arr)
+
         json.put("submitterUid", submitterUid)
         json.put("createdAt", createdAt)
         json.put("updatedAt", updatedAt)
@@ -92,6 +123,11 @@ data class ApplicationItem(
         json.put("downloadCount", downloadCount)
         json.put("isFeatured", isFeatured)
         json.put("isTrending", isTrending)
+
+        val vArr = JSONArray()
+        getAllVersions().forEach { vArr.put(it.toJson()) }
+        json.put("versions", vArr)
+
         return json
     }
 
@@ -99,19 +135,49 @@ data class ApplicationItem(
         fun fromMap(id: String, map: Map<String, Any?>): ApplicationItem {
             @Suppress("UNCHECKED_CAST")
             val screenshots = (map["screenshotUrls"] as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+
+            val rawVersions = (map["versions"] as? List<*>)
+            val parsedVersions = mutableListOf<AppVersionItem>()
+            if (rawVersions != null) {
+                for (v in rawVersions) {
+                    if (v is Map<*, *>) {
+                        @Suppress("UNCHECKED_CAST")
+                        parsedVersions.add(AppVersionItem.fromMap(v as Map<String, Any?>))
+                    }
+                }
+            }
+
+            val vName = (map["versionName"] as? String) ?: "1.0.0"
+            val vCode = (map["versionCode"] as? Number)?.toLong() ?: 1L
+            val dUrl = (map["downloadUrl"] as? String) ?: ""
+
+            if (parsedVersions.isEmpty() && dUrl.isNotBlank()) {
+                parsedVersions.add(
+                    AppVersionItem(
+                        versionName = vName,
+                        versionCode = vCode,
+                        downloadUrl = dUrl,
+                        releaseDate = (map["updatedAt"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                        changelog = "Initial release"
+                    )
+                )
+            }
+
             return ApplicationItem(
                 appId = (map["appId"] as? String) ?: id,
                 appName = (map["appName"] as? String) ?: "",
+                developerId = (map["developerId"] as? String) ?: "",
                 developerName = (map["developerName"] as? String) ?: "",
                 developerEmail = (map["developerEmail"] as? String) ?: "",
+                developerPasswordHash = (map["developerPasswordHash"] as? String) ?: "",
                 logoUrl = (map["logoUrl"] as? String) ?: "",
                 shortDescription = (map["shortDescription"] as? String) ?: "",
                 fullDescription = (map["fullDescription"] as? String) ?: "",
                 category = (map["category"] as? String) ?: "Tools",
-                versionName = (map["versionName"] as? String) ?: "1.0.0",
-                versionCode = (map["versionCode"] as? Number)?.toLong() ?: 1L,
+                versionName = vName,
+                versionCode = vCode,
                 minAndroidVersion = (map["minAndroidVersion"] as? String) ?: "Android 8.0 (API 26)",
-                downloadUrl = (map["downloadUrl"] as? String) ?: "",
+                downloadUrl = dUrl,
                 privacyPolicyUrl = (map["privacyPolicyUrl"] as? String) ?: "",
                 supportUrl = (map["supportUrl"] as? String) ?: "",
                 permissionsDisclosure = (map["permissionsDisclosure"] as? String) ?: "",
@@ -124,7 +190,8 @@ data class ApplicationItem(
                 rating = (map["rating"] as? Number)?.toFloat() ?: 4.8f,
                 downloadCount = (map["downloadCount"] as? Number)?.toLong() ?: 1200L,
                 isFeatured = (map["isFeatured"] as? Boolean) ?: false,
-                isTrending = (map["isTrending"] as? Boolean) ?: false
+                isTrending = (map["isTrending"] as? Boolean) ?: false,
+                versions = parsedVersions
             )
         }
 
@@ -136,19 +203,49 @@ data class ApplicationItem(
                     screenshots.add(arr.optString(i))
                 }
             }
+
+            val parsedVersions = mutableListOf<AppVersionItem>()
+            val vArr = json.optJSONArray("versions")
+            if (vArr != null) {
+                for (i in 0 until vArr.length()) {
+                    val obj = vArr.optJSONObject(i)
+                    if (obj != null) {
+                        parsedVersions.add(AppVersionItem.fromJson(obj))
+                    }
+                }
+            }
+
+            val vName = json.optString("versionName", "1.0.0")
+            val vCode = json.optLong("versionCode", 1L)
+            val dUrl = json.optString("downloadUrl")
+
+            if (parsedVersions.isEmpty() && dUrl.isNotBlank()) {
+                parsedVersions.add(
+                    AppVersionItem(
+                        versionName = vName,
+                        versionCode = vCode,
+                        downloadUrl = dUrl,
+                        releaseDate = json.optLong("updatedAt", System.currentTimeMillis()),
+                        changelog = "Initial release"
+                    )
+                )
+            }
+
             return ApplicationItem(
                 appId = json.optString("appId"),
                 appName = json.optString("appName"),
+                developerId = json.optString("developerId"),
                 developerName = json.optString("developerName"),
                 developerEmail = json.optString("developerEmail"),
+                developerPasswordHash = json.optString("developerPasswordHash"),
                 logoUrl = json.optString("logoUrl"),
                 shortDescription = json.optString("shortDescription"),
                 fullDescription = json.optString("fullDescription"),
                 category = json.optString("category", "Tools"),
-                versionName = json.optString("versionName", "1.0.0"),
-                versionCode = json.optLong("versionCode", 1L),
+                versionName = vName,
+                versionCode = vCode,
                 minAndroidVersion = json.optString("minAndroidVersion", "Android 8.0 (API 26)"),
-                downloadUrl = json.optString("downloadUrl"),
+                downloadUrl = dUrl,
                 privacyPolicyUrl = json.optString("privacyPolicyUrl"),
                 supportUrl = json.optString("supportUrl"),
                 permissionsDisclosure = json.optString("permissionsDisclosure"),
@@ -161,7 +258,8 @@ data class ApplicationItem(
                 rating = json.optDouble("rating", 4.8).toFloat(),
                 downloadCount = json.optLong("downloadCount", 1200L),
                 isFeatured = json.optBoolean("isFeatured", false),
-                isTrending = json.optBoolean("isTrending", false)
+                isTrending = json.optBoolean("isTrending", false),
+                versions = parsedVersions
             )
         }
     }

@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,12 +30,22 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Upgrade
+import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -108,6 +119,21 @@ fun PublishScreen(
 
     var newScreenshotUrl by remember { mutableStateOf("") }
     var categoryExpanded by remember { mutableStateOf(false) }
+
+    val currentDeveloper by viewModel.currentDeveloper.collectAsState()
+    val allApps by viewModel.repository.applications.collectAsState()
+    val myApps = remember(allApps, currentDeveloper) {
+        val devId = currentDeveloper?.developerId
+        if (devId.isNullOrBlank()) emptyList()
+        else allApps.filter { it.developerId.equals(devId, ignoreCase = true) }
+    }
+
+    var devAuthMode by remember { mutableStateOf(0) } // 0 = Login, 1 = Register
+    var devInputId by remember { mutableStateOf("") }
+    var devInputPass by remember { mutableStateOf("") }
+    var devInputName by remember { mutableStateOf("") }
+    var devPassVisible by remember { mutableStateOf(false) }
+    var devAuthMsg by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -210,7 +236,344 @@ fun PublishScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // DEVELOPER AUTHENTICATION & ACCESS CONTROL CARD
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("developer_account_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (currentDeveloper != null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                    else MaterialTheme.colorScheme.surfaceVariant
+                ),
+                border = if (currentDeveloper != null) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    val dev = currentDeveloper
+                    if (dev == null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Developer Identity & Security",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "Create ID & Password to upload & protect your APKs",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "Har developer ka apna alag ID & Password hota hai. Aapke ID se upload kiya gaya APK sirf aap hi update ya edit kar payenge, koi dusra developer nahi.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Toggle Tab: Sign In vs Create Account
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(4.dp)
+                        ) {
+                            Button(
+                                onClick = { devAuthMode = 0; devAuthMsg = null },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (devAuthMode == 0) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    contentColor = if (devAuthMode == 0) Color.White else MaterialTheme.colorScheme.onSurface
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(vertical = 6.dp)
+                            ) {
+                                Text("Sign In", fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { devAuthMode = 1; devAuthMsg = null },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (devAuthMode == 1) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    contentColor = if (devAuthMode == 1) Color.White else MaterialTheme.colorScheme.onSurface
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(vertical = 6.dp)
+                            ) {
+                                Text("Create ID & Pass", fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Developer ID Input
+                        OutlinedTextField(
+                            value = devInputId,
+                            onValueChange = { devInputId = it.trim().lowercase().replace(" ", "_") },
+                            label = { Text("Developer ID / Handle (e.g. rohit_dev) *") },
+                            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.fillMaxWidth().testTag("dev_auth_id_input"),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+
+                        if (devAuthMode == 1) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            // Developer Studio / Display Name
+                            OutlinedTextField(
+                                value = devInputName,
+                                onValueChange = { devInputName = it },
+                                label = { Text("Developer / Studio Display Name *") },
+                                placeholder = { Text("e.g. Rohit Studios") },
+                                modifier = Modifier.fillMaxWidth().testTag("dev_auth_name_input"),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Developer Password Input
+                        OutlinedTextField(
+                            value = devInputPass,
+                            onValueChange = { devInputPass = it },
+                            label = { Text("Password *") },
+                            visualTransformation = if (devPassVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { devPassVisible = !devPassVisible }) {
+                                    Icon(
+                                        imageVector = if (devPassVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = null
+                                    )
+                                }
+                            },
+                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.fillMaxWidth().testTag("dev_auth_pass_input"),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+
+                        if (devAuthMsg != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = devAuthMsg!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (devAuthMsg!!.contains("success", ignoreCase = true) || devAuthMsg!!.contains("logged", ignoreCase = true)) SuccessGreen else MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Button(
+                            onClick = {
+                                if (devAuthMode == 0) {
+                                    viewModel.loginDeveloper(devInputId, devInputPass) { success, err ->
+                                        devAuthMsg = if (success) "Successfully logged in as @$devInputId!" else (err ?: "Login failed")
+                                    }
+                                } else {
+                                    viewModel.registerDeveloper(devInputId, devInputName, devInputPass, "") { success, err ->
+                                        devAuthMsg = if (success) "Account @$devInputId created & logged in!" else (err ?: "Registration failed")
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("dev_auth_submit_btn"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = if (devAuthMode == 0) "Sign In as Developer" else "Create Developer ID & Sign In",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        // LOGGED IN DEVELOPER BADGE
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(SuccessGreen),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "@${dev.developerId}",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${dev.developerName} (Authorized Developer)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = SuccessGreen,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.logoutDeveloper() },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(34.dp)
+                            ) {
+                                Text("Log Out", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Aapke is ID ke sath upload kiya gaya koi bhi APK dusra developer edit nahi kar payega.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // If this developer has existing apps in catalog, show quick Uptodown style Update buttons
+                        if (myApps.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "Your Existing Apps (Click to Add New Version):",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                myApps.forEach { myApp ->
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.background,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { viewModel.prefillForAppUpdate(myApp) }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                AsyncImage(
+                                                    model = ImageRequest.Builder(context).data(myApp.logoUrl).crossfade(true).build(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                                Spacer(modifier = Modifier.width(10.dp))
+                                                Column {
+                                                    Text(myApp.appName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                                    Text("Current: v${myApp.versionName} • ${myApp.getAllVersions().size} versions", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                            }
+
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = MaterialTheme.colorScheme.primaryContainer
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(Icons.Default.Upgrade, contentDescription = null, modifier = Modifier.size(12.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Add Version", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // TARGET APP UPDATE BANNER (If updating an existing app)
+            if (form.targetAppId != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = CyanPrimaryLight.copy(alpha = 0.2f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Upgrade, contentDescription = null, tint = CyanPrimaryLight, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Adding New Version to '${form.appName}'", fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                "This update will be appended to the version history of '${form.appName}' (Uptodown style).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        TextButton(onClick = { viewModel.resetPublishSuccess() }) {
+                            Text("Cancel", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+
+            // SUBMISSION ERROR BANNER (e.g. Access Denied / Developer mismatch)
+            if (form.submissionError != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = form.submissionError!!,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
 
             // Submission Success Banner
             if (form.submissionSuccess) {

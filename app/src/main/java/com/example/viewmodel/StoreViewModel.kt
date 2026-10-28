@@ -30,6 +30,7 @@ sealed class Screen {
 }
 
 data class PublishFormState(
+    val targetAppId: String? = null,
     val appName: String = "",
     val developerName: String = "",
     val logoUrl: String = "",
@@ -40,6 +41,7 @@ data class PublishFormState(
     val versionCode: String = "1",
     val minAndroidVersion: String = "Android 8.0 (API 26)",
     val downloadUrl: String = "",
+    val changelog: String = "",
     val supportUrl: String = "",
     val permissionsDisclosure: String = "",
     val screenshotUrls: List<String> = emptyList(),
@@ -320,6 +322,63 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Developer Authentication & Authorization
+    val currentDeveloper = repository.developerSessionManager.currentDeveloper
+
+    fun registerDeveloper(devId: String, devName: String, pass: String, contact: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val res = repository.registerDeveloper(devId, devName, pass, contact)
+            res.onSuccess {
+                _publishForm.value = _publishForm.value.copy(developerName = it.developerName)
+                onResult(true, null)
+            }.onFailure {
+                onResult(false, it.message ?: "Registration failed")
+            }
+        }
+    }
+
+    fun loginDeveloper(devId: String, pass: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val res = repository.loginDeveloper(devId, pass)
+            res.onSuccess {
+                _publishForm.value = _publishForm.value.copy(developerName = it.developerName)
+                onResult(true, null)
+            }.onFailure {
+                onResult(false, it.message ?: "Invalid Developer credentials")
+            }
+        }
+    }
+
+    fun logoutDeveloper() {
+        repository.developerSessionManager.logout()
+    }
+
+    fun prefillForAppUpdate(app: ApplicationItem) {
+        val dev = repository.developerSessionManager.currentDeveloper.value
+        val nextVersionCode = (app.versionCode + 1).toString()
+        _publishForm.value = PublishFormState(
+            targetAppId = app.appId,
+            appName = app.appName,
+            developerName = if (dev != null) dev.developerName else app.developerName,
+            logoUrl = app.logoUrl,
+            shortDescription = app.shortDescription,
+            fullDescription = app.fullDescription,
+            category = app.category,
+            versionName = "", // Developer enters new version string (e.g. 2.0.0)
+            versionCode = nextVersionCode,
+            minAndroidVersion = app.minAndroidVersion,
+            downloadUrl = "", // Developer enters new download link
+            changelog = "Version update",
+            supportUrl = app.supportUrl,
+            permissionsDisclosure = app.permissionsDisclosure,
+            screenshotUrls = app.screenshotUrls,
+            hasDistributionRights = true,
+            isInfoAccurate = true,
+            agreesToRules = true
+        )
+        _currentScreen.value = Screen.Publish
+    }
+
     // Publish Form Mutators
     fun updatePublishAppName(value: String) { _publishForm.value = _publishForm.value.copy(appName = value) }
     fun updatePublishDevName(value: String) { _publishForm.value = _publishForm.value.copy(developerName = value) }
@@ -331,6 +390,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     fun updatePublishVersionCode(value: String) { _publishForm.value = _publishForm.value.copy(versionCode = value) }
     fun updatePublishMinAndroid(value: String) { _publishForm.value = _publishForm.value.copy(minAndroidVersion = value) }
     fun updatePublishDownloadUrl(value: String) { _publishForm.value = _publishForm.value.copy(downloadUrl = value) }
+    fun updatePublishChangelog(value: String) { _publishForm.value = _publishForm.value.copy(changelog = value) }
     fun updatePublishSupport(value: String) { _publishForm.value = _publishForm.value.copy(supportUrl = value) }
     fun updatePublishPermissions(value: String) { _publishForm.value = _publishForm.value.copy(permissionsDisclosure = value) }
     fun addScreenshotUrl(url: String) {
@@ -353,6 +413,8 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         val form = _publishForm.value
         if (!form.isFormValid) return
 
+        val activeDev = repository.developerSessionManager.currentDeveloper.value
+
         _publishForm.value = form.copy(isSubmitting = true, submissionError = null)
         viewModelScope.launch {
             val normalizedDownload = when {
@@ -370,8 +432,10 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val app = ApplicationItem(
+                appId = form.targetAppId ?: "",
                 appName = form.appName.trim(),
-                developerName = form.developerName.trim(),
+                developerId = activeDev?.developerId ?: "",
+                developerName = activeDev?.developerName ?: form.developerName.trim(),
                 developerEmail = "",
                 logoUrl = normalizedLogo,
                 shortDescription = form.shortDescription.trim(),
@@ -388,7 +452,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                 publicationStatus = "published"
             )
 
-            val result = repository.publishApplication(app)
+            val result = repository.publishApplication(app, activeDev)
             result.onSuccess {
                 _publishForm.value = PublishFormState(submissionSuccess = true)
                 onSuccess()
