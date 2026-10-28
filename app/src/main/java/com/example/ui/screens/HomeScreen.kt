@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -143,8 +144,24 @@ fun HomeScreen(
                             }
                         }
 
-                        // Actions in Header: Share NovaStore + Submit
+                        // Actions in Header: Refresh + Share NovaStore + Submit
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { viewModel.refreshCatalog() },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("header_refresh_catalog_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Refresh Store Catalog",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(4.dp))
+
                             IconButton(
                                 onClick = { AppShareHelper.shareNovaStoreApp(context) },
                                 modifier = Modifier

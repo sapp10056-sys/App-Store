@@ -95,44 +95,46 @@ class AppRepository(private val context: Context) {
         }
     }
 
-    private fun setupFirebase() {
-        try {
-            if (FirebaseApp.getApps(context).isEmpty()) {
-                val options = FirebaseOptions.Builder()
-                    .setApplicationId("1:254580169529:android:a1b2c3d4e5f67890")
-                    .setApiKey("AIzaSyArRzwyy9YgSPnx3B-TYq50Uctd5tXS0SI")
-                    .setProjectId("app-store-a9559")
-                    .setStorageBucket("app-store-a9559.firebasestorage.app")
-                    .setDatabaseUrl("https://app-store-a9559-default-rtdb.asia-southeast1.firebasedatabase.app")
-                    .setGcmSenderId("254580169529")
-                    .build()
-                FirebaseApp.initializeApp(context, options)
-            }
-            firestore = FirebaseFirestore.getInstance()
-            auth = FirebaseAuth.getInstance()
-
-            signInSilently()
-            listenToApplications()
-        } catch (e: Exception) {
-            Log.e(tag, "Firebase initialization fallback: ${e.message}", e)
-            _isLoading.value = false
+    private fun getOrCreateUserId(): String {
+        val prefs = context.getSharedPreferences("novastore_user_prefs", Context.MODE_PRIVATE)
+        var uid = prefs.getString("user_uid", null)
+        if (uid.isNullOrBlank()) {
+            uid = "user_" + UUID.randomUUID().toString().replace("-", "").take(12)
+            prefs.edit().putString("user_uid", uid).apply()
         }
+        return uid
     }
 
-    private fun signInSilently() {
-        val currentAuth = auth ?: return
-        if (currentAuth.currentUser != null) {
-            currentUserId = currentAuth.currentUser?.uid ?: "device_user"
-        } else {
-            currentAuth.signInAnonymously()
-                .addOnSuccessListener { result ->
-                    currentUserId = result.user?.uid ?: "device_user"
-                    Log.d(tag, "Silently authenticated user: $currentUserId")
+    private fun setupFirebase() {
+        try {
+            currentUserId = getOrCreateUserId()
+            val app = if (FirebaseApp.getApps(context).isEmpty()) {
+                FirebaseApp.initializeApp(context) ?: FirebaseApp.getInstance()
+            } else {
+                FirebaseApp.getInstance()
+            }
+
+            val dbId = try {
+                context.getString(com.example.R.string.firestore_database_id)
+            } catch (e: Exception) {
+                ""
+            }
+
+            firestore = try {
+                if (dbId.isNotBlank()) {
+                    FirebaseFirestore.getInstance(app, dbId)
+                } else {
+                    FirebaseFirestore.getInstance(app)
                 }
-                .addOnFailureListener { e ->
-                    Log.w(tag, "Silent auth fallback: ${e.message}")
-                    currentUserId = "anon_" + UUID.randomUUID().toString().take(8)
-                }
+            } catch (e: Exception) {
+                Log.w(tag, "Failed to initialize with dbId $dbId, falling back to default: ${e.message}")
+                FirebaseFirestore.getInstance(app)
+            }
+
+            listenToApplications()
+        } catch (e: Exception) {
+            Log.e(tag, "Firebase initialization error: ${e.message}", e)
+            _isLoading.value = false
         }
     }
 
@@ -159,6 +161,7 @@ class AppRepository(private val context: Context) {
                     }
                     _applications.value = list
                     saveApplicationsToDisk(list)
+                    Log.d(tag, "Loaded ${list.size} apps from shared cloud catalog")
                 } else {
                     // Pre-populate initial catalog if cloud collection is empty
                     if (_applications.value.isEmpty()) {
@@ -166,6 +169,9 @@ class AppRepository(private val context: Context) {
                         _applications.value = curated
                         saveApplicationsToDisk(curated)
                         seedSampleAppsIfEmpty(curated)
+                    } else {
+                        // Seed existing apps to cloud so other users can see them
+                        seedSampleAppsIfEmpty(_applications.value)
                     }
                 }
             }
@@ -178,21 +184,56 @@ class AppRepository(private val context: Context) {
                 for (app in samples) {
                     db.collection("applications").document(app.appId).set(app.toMap()).await()
                 }
-                Log.d(tag, "Seeded initial verified applications to Firestore")
+                Log.d(tag, "Seeded verified applications to Firestore catalog")
             } catch (e: Exception) {
-                Log.w(tag, "Note: Firestore seeding fallback to local: ${e.message}")
+                Log.w(tag, "Firestore seeding note: ${e.message}")
+            }
+        }
+    }
+
+    suspend fun refreshCatalog() {
+        withContext(Dispatchers.IO) {
+            try {
+                firestore?.let { db ->
+                    val snapshot = db.collection("applications")
+                        .orderBy("createdAt", Query.Direction.DESCENDING)
+                        .get()
+                        .await()
+                    if (!snapshot.isEmpty) {
+                        val list = snapshot.documents.mapNotNull { doc ->
+                            doc.data?.let { data ->
+                                ApplicationItem.fromMap(doc.id, data)
+                            }
+                        }
+                        if (list.isNotEmpty()) {
+                            _applications.value = list
+                            saveApplicationsToDisk(list)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "Manual catalog refresh note: ${e.message}")
             }
         }
     }
 
     suspend fun publishApplication(app: ApplicationItem): Result<String> {
         return withContext(Dispatchers.IO) {
-            val id = if (app.appId.isNotBlank()) app.appId else "app_" + UUID.randomUUID().toString().replace("-", "").take(12)
+            // Check if app with same name or same ID already exists to update it!
+            val existing = _applications.value.find {
+                (app.appId.isNotBlank() && it.appId == app.appId) ||
+                it.appName.equals(app.appName, ignoreCase = true)
+            }
+
+            val id = existing?.appId ?: if (app.appId.isNotBlank()) app.appId else "app_" + UUID.randomUUID().toString().replace("-", "").take(12)
             val updatedApp = app.copy(
                 appId = id,
-                submitterUid = currentUserId,
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
+                submitterUid = if (existing?.submitterUid.isNullOrBlank()) currentUserId else existing!!.submitterUid,
+                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                rating = existing?.rating ?: app.rating,
+                downloadCount = existing?.downloadCount ?: app.downloadCount,
+                publicationStatus = "published"
             )
 
             // 1. Immediately update in-memory state and persist to disk (instant response)
@@ -202,17 +243,15 @@ class AppRepository(private val context: Context) {
             _applications.value = currentList
             saveApplicationsToDisk(currentList)
 
-            // 2. Synchronize to Firestore in background without blocking the UI
+            // 2. Synchronize to Firestore so all other users see it immediately
             firestore?.let { db ->
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        withTimeoutOrNull(2500L) {
-                            db.collection("applications").document(id).set(updatedApp.toMap()).await()
-                        }
-                        Log.d(tag, "Successfully uploaded app $id to Firestore")
-                    } catch (e: Exception) {
-                        Log.w(tag, "Background Firestore sync handled: ${e.message}")
+                try {
+                    withTimeoutOrNull(6000L) {
+                        db.collection("applications").document(id).set(updatedApp.toMap()).await()
                     }
+                    Log.d(tag, "Successfully uploaded app $id to shared Firestore catalog")
+                } catch (e: Exception) {
+                    Log.w(tag, "Firestore publish sync note: ${e.message}")
                 }
             }
 
@@ -248,37 +287,37 @@ class AppRepository(private val context: Context) {
     }
 
     suspend fun updateAppStatus(appId: String, newStatus: String): Result<Unit> {
-        val currentList = _applications.value.map {
-            if (it.appId == appId) it.copy(publicationStatus = newStatus) else it
-        }
-        _applications.value = currentList
-        saveApplicationsToDisk(currentList)
+        return withContext(Dispatchers.IO) {
+            val currentList = _applications.value.map {
+                if (it.appId == appId) it.copy(publicationStatus = newStatus) else it
+            }
+            _applications.value = currentList
+            saveApplicationsToDisk(currentList)
 
-        firestore?.let { db ->
-            CoroutineScope(Dispatchers.IO).launch {
+            firestore?.let { db ->
                 try {
-                    withTimeoutOrNull(2500L) {
+                    withTimeoutOrNull(5000L) {
                         db.collection("applications").document(appId).update("publicationStatus", newStatus).await()
                     }
                 } catch (e: Exception) {
                     Log.w(tag, "Firestore updateStatus handled: ${e.message}")
                 }
             }
+            Result.success(Unit)
         }
-        return Result.success(Unit)
     }
 
     suspend fun updateApp(updatedApp: ApplicationItem): Result<Unit> {
-        val currentList = _applications.value.map {
-            if (it.appId == updatedApp.appId) updatedApp else it
-        }
-        _applications.value = currentList
-        saveApplicationsToDisk(currentList)
+        return withContext(Dispatchers.IO) {
+            val currentList = _applications.value.map {
+                if (it.appId == updatedApp.appId) updatedApp else it
+            }
+            _applications.value = currentList
+            saveApplicationsToDisk(currentList)
 
-        firestore?.let { db ->
-            CoroutineScope(Dispatchers.IO).launch {
+            firestore?.let { db ->
                 try {
-                    withTimeoutOrNull(2500L) {
+                    withTimeoutOrNull(5000L) {
                         db.collection("applications").document(updatedApp.appId)
                             .set(updatedApp.copy(updatedAt = System.currentTimeMillis()).toMap()).await()
                     }
@@ -286,27 +325,27 @@ class AppRepository(private val context: Context) {
                     Log.w(tag, "Firestore updateApp handled: ${e.message}")
                 }
             }
+            Result.success(Unit)
         }
-        return Result.success(Unit)
     }
 
     suspend fun deleteApp(appId: String): Result<Unit> {
-        val currentList = _applications.value.filter { it.appId != appId }
-        _applications.value = currentList
-        saveApplicationsToDisk(currentList)
+        return withContext(Dispatchers.IO) {
+            val currentList = _applications.value.filter { it.appId != appId }
+            _applications.value = currentList
+            saveApplicationsToDisk(currentList)
 
-        firestore?.let { db ->
-            CoroutineScope(Dispatchers.IO).launch {
+            firestore?.let { db ->
                 try {
-                    withTimeoutOrNull(2500L) {
+                    withTimeoutOrNull(5000L) {
                         db.collection("applications").document(appId).delete().await()
                     }
                 } catch (e: Exception) {
                     Log.w(tag, "Firestore deleteApp handled: ${e.message}")
                 }
             }
+            Result.success(Unit)
         }
-        return Result.success(Unit)
     }
 
     fun searchApplications(query: String, category: String): List<ApplicationItem> {

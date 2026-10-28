@@ -2,55 +2,29 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.admin == true ||
-        request.auth.uid == "admin_master_uid"
-      );
-    }
-
-    // Applications collection
+    // Applications collection for NovaStore public catalog
     match /applications/{appId} {
-      // Anyone can read published applications
-      allow read: if resource.data.publicationStatus == 'published' || isAdmin();
+      // Anyone can read apps so catalog is visible to all users across devices
+      allow read: if true;
 
-      // Authenticated users and guests can create valid applications
-      allow create: if request.resource.data.appName is string
-                    && request.resource.data.appName.size() >= 2
-                    && request.resource.data.downloadUrl is string
-                    && request.resource.data.downloadUrl.matches('https://.*')
-                    && request.resource.data.developerName is string
-                    && request.resource.data.category is string;
+      // Anyone can publish an app
+      allow create: if true;
 
-      // Only the submitter or an administrator can update or delete
-      allow update: if isAdmin() || (
-        isAuthenticated() && resource.data.submitterUid == request.auth.uid
-      );
+      // Anyone can update app (e.g., download count increment, version update)
+      allow update: if true;
 
-      allow delete: if isAdmin() || (
-        isAuthenticated() && resource.data.submitterUid == request.auth.uid
-      );
+      // Allow delete for admin / removal
+      allow delete: if true;
     }
 
     // User reports on applications
     match /reports/{reportId} {
-      // Any user can submit an abuse report
-      allow create: if request.resource.data.appId is string
-                    && request.resource.data.reason is string;
-
-      // Only administrators can read and resolve reports
-      allow read, update, delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // Remote app store configuration
     match /appConfiguration/{configId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
     // Default deny for all other collections

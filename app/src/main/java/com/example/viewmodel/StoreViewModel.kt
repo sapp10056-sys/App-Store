@@ -199,6 +199,12 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         _currentScreen.value = target
     }
 
+    fun refreshCatalog() {
+        viewModelScope.launch {
+            repository.refreshCatalog()
+        }
+    }
+
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
     }
