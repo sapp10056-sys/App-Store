@@ -66,7 +66,7 @@ Navigate to the **Actions** tab on your GitHub repository, click on the latest w
 
 ### STEP 7: Register Android Application in Firebase
 1. Click **Add App** -> **Android**.
-2. Enter the Package Name: `com.aistudio.novastore.app`.
+2. Enter the Package Name: `com.novastore.app`.
 3. Provide your debug and release SHA-1 certificates.
 
 ### STEP 8: Install `google-services.json`
