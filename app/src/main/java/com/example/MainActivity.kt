@@ -39,8 +39,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Anti-tamper & anti-modding integrity verification: terminates process if modded
-        SecurityIntegrityChecker.checkIntegrityOrCrash(this)
+        try {
+            // Anti-tamper & anti-modding integrity verification: terminates process if modded
+            SecurityIntegrityChecker.checkIntegrityOrCrash(this)
+        } catch (e: SecurityException) {
+            throw e
+        } catch (_: Exception) {}
         try {
             MobileAds.initialize(this) {}
         } catch (_: Exception) {}

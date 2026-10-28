@@ -1,6 +1,7 @@
 package com.example
 
 import android.app.Application
+import android.util.Log
 import com.example.security.SecurityIntegrityChecker
 
 /**
@@ -11,7 +12,13 @@ import com.example.security.SecurityIntegrityChecker
 class NovaApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Verify signature, package name, and anti-kill-sign integrity immediately on launch
-        SecurityIntegrityChecker.checkIntegrityOrCrash(this)
+        try {
+            // Verify signature, package name, and anti-kill-sign integrity on launch
+            SecurityIntegrityChecker.checkIntegrityOrCrash(this)
+        } catch (e: SecurityException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("NovaApplication", "Startup security note: ${e.message}")
+        }
     }
 }
