@@ -50,7 +50,8 @@ data class PublishFormState(
     val agreesToRules: Boolean = false,
     val isSubmitting: Boolean = false,
     val submissionError: String? = null,
-    val submissionSuccess: Boolean = false
+    val submissionSuccess: Boolean = false,
+    val lastPublishedApp: ApplicationItem? = null
 ) {
     val isAppNameValid: Boolean get() = appName.trim().length >= 2
     val isDevNameValid: Boolean get() = developerName.trim().length >= 2
@@ -453,8 +454,16 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             val result = repository.publishApplication(app, activeDev)
-            result.onSuccess {
-                _publishForm.value = PublishFormState(submissionSuccess = true)
+            result.onSuccess { publishedId ->
+                val publishedApp = app.copy(
+                    appId = publishedId,
+                    developerId = activeDev?.developerId ?: app.developerId,
+                    developerName = activeDev?.developerName ?: app.developerName
+                )
+                _publishForm.value = PublishFormState(
+                    submissionSuccess = true,
+                    lastPublishedApp = publishedApp
+                )
                 onSuccess()
             }.onFailure { err ->
                 _publishForm.value = _publishForm.value.copy(
