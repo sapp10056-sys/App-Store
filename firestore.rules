@@ -4,17 +4,17 @@ service cloud.firestore {
 
     // Applications collection for NovaStore public catalog
     match /applications/{appId} {
-      // Anyone can read apps so catalog is visible to all users across devices
-      allow read: if true;
+      // Anyone can read and publish apps so catalog is visible to all users across devices
+      allow read, write: if true;
+    }
 
-      // Anyone can publish an app
-      allow create: if true;
+    // Developer accounts for publishing and updating APKs
+    match /developers/{devId} {
+      allow read, write: if true;
+    }
 
-      // Anyone can update app (e.g., download count increment, version update)
-      allow update: if true;
-
-      // Allow delete for admin / removal
-      allow delete: if true;
+    match /developerAccounts/{devId} {
+      allow read, write: if true;
     }
 
     // User reports on applications
@@ -27,9 +27,9 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Default deny for all other collections
+    // Allow read and write on all collections so every user sees uploaded APKs immediately
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }

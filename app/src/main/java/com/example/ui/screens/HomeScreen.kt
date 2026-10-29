@@ -63,6 +63,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.model.ApplicationItem
 import com.example.ui.components.AppCard
+import com.example.ui.components.AppLogoImage
 import com.example.ui.components.CategoryChips
 import com.example.ui.theme.CyanPrimaryDark
 import com.example.ui.theme.CyanPrimaryLight
@@ -428,25 +429,12 @@ fun FeaturedAppCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(app.logoUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = app.appName,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                    )
-                }
+                AppLogoImage(
+                    logoUrl = app.logoUrl,
+                    appName = app.appName,
+                    iconSize = 52.dp,
+                    shape = RoundedCornerShape(12.dp)
+                )
 
                 Spacer(modifier = Modifier.width(12.dp))
 

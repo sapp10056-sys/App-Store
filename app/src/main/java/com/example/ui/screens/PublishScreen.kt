@@ -99,6 +99,8 @@ import coil.request.ImageRequest
 import com.example.model.ApplicationItem
 import com.example.model.DeveloperAccount
 import com.example.model.StoreCategories
+import com.example.ui.components.AppLogoImage
+import com.example.util.ImageUrlResolver
 import com.example.ui.theme.CyanPrimaryLight
 import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.VioletSecondaryDark
@@ -1089,31 +1091,71 @@ private fun PublishPage2Details(
         OutlinedTextField(
             value = form.logoUrl,
             onValueChange = { viewModel.updatePublishLogoUrl(it) },
-            label = { Text("App Icon URL (HTTPS) - Optional") },
-            placeholder = { Text("https://example.com/icon.png") },
+            label = { Text("App Icon URL (Optional)") },
+            placeholder = { Text("https://postimg.cc/... or Google Drive or direct link") },
+            supportingText = { Text("Supports Postimg, Imgur, Google Drive, GitHub & Direct URLs") },
             modifier = Modifier.fillMaxWidth().testTag("input_logo_url"),
             shape = RoundedCornerShape(12.dp),
             singleLine = true
         )
 
-        if (form.logoUrl.isNotBlank()) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context).data(form.logoUrl).crossfade(true).build(),
-                    contentDescription = "Icon Preview",
-                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Quick Preset Icons for Developers
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Presets:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            listOf("Tools", "Games", "Media", "Social").forEach { categoryName ->
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                    modifier = Modifier.clickable {
+                        viewModel.updatePublishLogoUrl(ImageUrlResolver.getPresetIcon(categoryName))
+                    }
+                ) {
+                    Text(
+                        text = categoryName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Live Icon Preview
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AppLogoImage(
+                logoUrl = form.logoUrl,
+                appName = form.appName.ifBlank { "App" },
+                iconSize = 44.dp,
+                shape = RoundedCornerShape(10.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = if (form.logoUrl.isNotBlank()) "Icon Live Preview (Ready)" else "Branded Fallback Icon (Ready)",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text("Icon Live Preview", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = if (form.logoUrl.isNotBlank()) "Auto-resolves direct image and link headers" else "A clean avatar with app initial will be displayed",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 

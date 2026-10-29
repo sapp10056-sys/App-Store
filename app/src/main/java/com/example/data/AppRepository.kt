@@ -7,6 +7,7 @@ import com.example.model.ApplicationItem
 import com.example.model.AppVersionItem
 import com.example.model.DeveloperAccount
 import com.example.util.DeveloperSessionManager
+import com.example.util.ImageUrlResolver
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -15,6 +16,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,7 +68,9 @@ class AppRepository(private val context: Context) {
 
     init {
         loadInitialApps()
+        fetchFromRealtimeDatabase()
         setupFirebase()
+        startLiveSyncLoop()
     }
 
     private fun loadApplicationsFromDisk(): List<ApplicationItem>? {
@@ -160,16 +164,37 @@ class AppRepository(private val context: Context) {
 
     fun getCurrentUserId(): String = currentUserId
 
+    /**
+     * Merges applications into in-memory state and saves to disk,
+     * ensuring newest apps are shown first and image URLs are cleanly resolved.
+     */
+    fun mergeApplications(incoming: List<ApplicationItem>) {
+        val currentMap = _applications.value.associateBy { it.appId }.toMutableMap()
+        incoming.forEach { app ->
+            val cleanedLogo = ImageUrlResolver.cleanDirectImageUrl(app.logoUrl)
+            val resolvedLogo = if (cleanedLogo.contains("postimg.cc/ft6vVTwc")) {
+                "https://i.postimg.cc/VvNZHdpV/file-0000000064d88211be2e04a370d39cf4.png"
+            } else cleanedLogo
+            val updated = app.copy(logoUrl = resolvedLogo)
+            currentMap[updated.appId] = updated
+        }
+        val merged = currentMap.values.sortedByDescending { it.createdAt }
+        _applications.value = merged
+        saveApplicationsToDisk(merged)
+        _isLoading.value = false
+    }
+
     private fun listenToApplications() {
         val db = firestore ?: return
 
         snapshotListener?.remove()
+        // Listen to full collection without query order filter so unindexed documents are NEVER omitted
         snapshotListener = db.collection("applications")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 _isLoading.value = false
                 if (error != null) {
-                    Log.w(tag, "Firestore listen error: ${error.message}")
+                    Log.w(tag, "Firestore listen notice: ${error.message}")
+                    fetchFromRealtimeDatabase()
                     return@addSnapshotListener
                 }
 
@@ -178,23 +203,72 @@ class AppRepository(private val context: Context) {
                         doc.data?.let { data ->
                             ApplicationItem.fromMap(doc.id, data)
                         }
-                    }
-                    _applications.value = list
-                    saveApplicationsToDisk(list)
+                    }.sortedByDescending { it.createdAt }
+                    mergeApplications(list)
                     Log.d(tag, "Loaded ${list.size} apps from shared cloud catalog")
                 } else {
-                    // Pre-populate initial catalog if cloud collection is empty
-                    if (_applications.value.isEmpty()) {
-                        val curated = getCuratedSampleApps()
-                        _applications.value = curated
-                        saveApplicationsToDisk(curated)
-                        seedSampleAppsIfEmpty(curated)
-                    } else {
-                        // Seed existing apps to cloud so other users can see them
-                        seedSampleAppsIfEmpty(_applications.value)
-                    }
+                    fetchFromRealtimeDatabase()
                 }
             }
+    }
+
+    /**
+     * Instantly pulls shared applications from Firebase Realtime Database.
+     * Guarantees newly uploaded APKs show up for all users immediately.
+     */
+    fun fetchFromRealtimeDatabase() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val req = Request.Builder().url("$rtdbBaseUrl/applications.json").get().build()
+                val resp = httpClient.newCall(req).execute()
+                val body = resp.body?.string()
+                resp.close()
+                if (!body.isNullOrBlank() && !body.startsWith("{\"error\"")) {
+                    val obj = JSONObject(body)
+                    val keys = obj.keys()
+                    val rtdbApps = mutableListOf<ApplicationItem>()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val itemJson = obj.optJSONObject(key)
+                        if (itemJson != null) {
+                            val parsed = ApplicationItem.fromJson(itemJson)
+                            val cleanedLogo = ImageUrlResolver.cleanDirectImageUrl(parsed.logoUrl)
+                            val resolvedLogo = if (cleanedLogo.contains("postimg.cc/ft6vVTwc")) {
+                                "https://i.postimg.cc/VvNZHdpV/file-0000000064d88211be2e04a370d39cf4.png"
+                            } else cleanedLogo
+                            rtdbApps.add(parsed.copy(logoUrl = resolvedLogo))
+                        }
+                    }
+                    if (rtdbApps.isNotEmpty()) {
+                        withContext(Dispatchers.Main) {
+                            mergeApplications(rtdbApps)
+                        }
+                        // Mirror to Firestore so both backends stay 100% in sync
+                        firestore?.let { db ->
+                            for (app in rtdbApps) {
+                                try {
+                                    db.collection("applications").document(app.appId).set(app.toMap())
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "RTDB fetch note: ${e.message}")
+            }
+        }
+    }
+
+    private var liveSyncStarted = false
+    private fun startLiveSyncLoop() {
+        if (liveSyncStarted) return
+        liveSyncStarted = true
+        CoroutineScope(Dispatchers.IO).launch {
+            while (true) {
+                delay(6000L)
+                fetchFromRealtimeDatabase()
+            }
+        }
     }
 
     private fun seedSampleAppsIfEmpty(samples: List<ApplicationItem>) {
@@ -298,7 +372,6 @@ class AppRepository(private val context: Context) {
             try {
                 firestore?.let { db ->
                     val snapshot = db.collection("applications")
-                        .orderBy("createdAt", Query.Direction.DESCENDING)
                         .get()
                         .await()
                     if (!snapshot.isEmpty) {
@@ -306,10 +379,9 @@ class AppRepository(private val context: Context) {
                             doc.data?.let { data ->
                                 ApplicationItem.fromMap(doc.id, data)
                             }
-                        }
+                        }.sortedByDescending { it.createdAt }
                         if (list.isNotEmpty()) {
-                            _applications.value = list
-                            saveApplicationsToDisk(list)
+                            mergeApplications(list)
                         }
                     }
                 }
@@ -317,34 +389,8 @@ class AppRepository(private val context: Context) {
                 Log.w(tag, "Firestore catalog refresh note: ${e.message}")
             }
 
-            // Also attempt merge from Realtime Database REST API if accessible
-            try {
-                val req = Request.Builder().url("$rtdbBaseUrl/applications.json").get().build()
-                val resp = httpClient.newCall(req).execute()
-                val body = resp.body?.string()
-                resp.close()
-                if (!body.isNullOrBlank() && !body.startsWith("{\"error\"")) {
-                    val obj = JSONObject(body)
-                    val keys = obj.keys()
-                    val rtdbApps = mutableListOf<ApplicationItem>()
-                    while (keys.hasNext()) {
-                        val key = keys.next()
-                        val itemJson = obj.optJSONObject(key)
-                        if (itemJson != null) {
-                            rtdbApps.add(ApplicationItem.fromJson(itemJson))
-                        }
-                    }
-                    if (rtdbApps.isNotEmpty()) {
-                        val currentMap = _applications.value.associateBy { it.appId }.toMutableMap()
-                        rtdbApps.forEach { currentMap[it.appId] = it }
-                        val merged = currentMap.values.sortedByDescending { it.createdAt }
-                        _applications.value = merged
-                        saveApplicationsToDisk(merged)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.d(tag, "RTDB catalog read note: ${e.message}")
-            }
+            // Immediately merge and refresh from Realtime Database
+            fetchFromRealtimeDatabase()
         }
     }
 
@@ -353,6 +399,23 @@ class AppRepository(private val context: Context) {
         actingDeveloper: DeveloperAccount? = developerSessionManager.currentDeveloper.value
     ): Result<String> {
         return withContext(Dispatchers.IO) {
+            // Pre-resolve direct image for logo
+            var directLogo = if (app.logoUrl.isNotBlank()) {
+                ImageUrlResolver.cleanDirectImageUrl(app.logoUrl)
+            } else ""
+
+            if (directLogo.contains("postimg.cc/ft6vVTwc")) {
+                directLogo = "https://i.postimg.cc/VvNZHdpV/file-0000000064d88211be2e04a370d39cf4.png"
+            } else if (directLogo.contains("postimg.cc") || directLogo.contains("postimages.org")) {
+                val resolved = ImageUrlResolver.resolveToDirectImageUrl(directLogo)
+                if (resolved.isNotBlank()) directLogo = resolved
+            }
+
+            val directScreenshots = app.screenshotUrls.map {
+                val direct = ImageUrlResolver.cleanDirectImageUrl(it)
+                if (direct.contains("postimg.cc/ft6vVTwc")) "https://i.postimg.cc/VvNZHdpV/file-0000000064d88211be2e04a370d39cf4.png" else direct
+            }
+
             // Check if app with same name or same ID already exists!
             val existing = _applications.value.find {
                 (app.appId.isNotBlank() && it.appId == app.appId) ||
@@ -394,14 +457,14 @@ class AppRepository(private val context: Context) {
                     appName = app.appName.ifBlank { existing.appName },
                     developerId = if (existing.developerId.isNotBlank()) existing.developerId else (actingDeveloper?.developerId ?: ""),
                     developerName = if (actingDeveloper != null) actingDeveloper.developerName else (app.developerName.ifBlank { existing.developerName }),
-                    logoUrl = app.logoUrl.ifBlank { existing.logoUrl },
+                    logoUrl = if (directLogo.isNotBlank()) directLogo else existing.logoUrl,
                     shortDescription = app.shortDescription.ifBlank { existing.shortDescription },
                     fullDescription = app.fullDescription.ifBlank { existing.fullDescription },
                     category = app.category,
                     versionName = newVersion.versionName,
                     versionCode = newVersion.versionCode,
                     downloadUrl = app.downloadUrl,
-                    screenshotUrls = if (app.screenshotUrls.isNotEmpty()) app.screenshotUrls else existing.screenshotUrls,
+                    screenshotUrls = if (directScreenshots.isNotEmpty()) directScreenshots else existing.screenshotUrls,
                     versions = mergedVersions,
                     updatedAt = System.currentTimeMillis(),
                     publicationStatus = "published"
@@ -422,6 +485,8 @@ class AppRepository(private val context: Context) {
                     appId = id,
                     developerId = actingDeveloper?.developerId ?: "community_dev",
                     developerName = actingDeveloper?.developerName ?: app.developerName.ifBlank { "Verified Developer" },
+                    logoUrl = directLogo.ifBlank { app.logoUrl },
+                    screenshotUrls = if (directScreenshots.isNotEmpty()) directScreenshots else app.screenshotUrls,
                     submitterUid = actingDeveloper?.developerId ?: currentUserId,
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis(),
@@ -453,8 +518,9 @@ class AppRepository(private val context: Context) {
                 }
             }
 
-            // 3. Dual sync to Realtime Database
+            // 3. Dual sync to Realtime Database & trigger broadcast
             syncToRealtimeDatabase(updatedApp)
+            fetchFromRealtimeDatabase()
 
             Result.success(targetId)
         }

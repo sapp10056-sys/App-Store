@@ -72,36 +72,12 @@ fun AppCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // App Logo with Image Preview & Fallback
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(app.logoUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "${app.appName} logo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(14.dp)),
-                    onError = {
-                        // Fallback will be shown
-                    }
-                )
-                if (app.logoUrl.isBlank()) {
-                    Icon(
-                        imageVector = Icons.Outlined.Apps,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
+            AppLogoImage(
+                logoUrl = app.logoUrl,
+                appName = app.appName,
+                iconSize = 64.dp,
+                shape = RoundedCornerShape(14.dp)
+            )
 
             Spacer(modifier = Modifier.width(14.dp))
 

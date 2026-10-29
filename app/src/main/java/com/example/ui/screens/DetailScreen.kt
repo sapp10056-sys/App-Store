@@ -67,6 +67,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.model.ApplicationItem
 import com.example.model.DeveloperAccount
+import com.example.ui.components.AppLogoImage
+import com.example.ui.components.AppScreenshotImage
 import com.example.ui.theme.CyanPrimaryLight
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.SuccessGreen
@@ -161,25 +163,12 @@ fun DetailScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(app.logoUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "${app.appName} Logo",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                    )
-                }
+                AppLogoImage(
+                    logoUrl = app.logoUrl,
+                    appName = app.appName,
+                    iconSize = 80.dp,
+                    shape = RoundedCornerShape(18.dp)
+                )
 
                 Spacer(modifier = Modifier.width(16.dp))
 
@@ -402,18 +391,12 @@ fun DetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(app.screenshotUrls) { url ->
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(url)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Screenshot",
-                            contentScale = ContentScale.Crop,
+                        AppScreenshotImage(
+                            url = url,
                             modifier = Modifier
                                 .height(220.dp)
-                                .width(130.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .width(130.dp),
+                            shape = RoundedCornerShape(12.dp)
                         )
                     }
                 }

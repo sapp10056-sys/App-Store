@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.model.ApplicationItem
+import com.example.ui.components.AppLogoImage
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.WarningAmber
@@ -525,22 +526,12 @@ fun AdminAppItem(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(app.logoUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        modifier = Modifier.size(46.dp)
-                    )
-                }
+                AppLogoImage(
+                    logoUrl = app.logoUrl,
+                    appName = app.appName,
+                    iconSize = 46.dp,
+                    shape = RoundedCornerShape(10.dp)
+                )
 
                 Spacer(modifier = Modifier.width(12.dp))
 
