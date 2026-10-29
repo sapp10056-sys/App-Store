@@ -1,10 +1,10 @@
 {
-  "latestVersionCode": 1,
-  "latestVersionName": "1.0.0",
-  "minimumSupportedVersionCode": 1,
+  "latestVersionCode": 2,
+  "latestVersionName": "2.0.0",
+  "minimumSupportedVersionCode": 2,
   "forceUpdate": false,
   "downloadUrl": "https://github.com/sapp10056-sys/App-Store/releases/latest",
-  "releaseNotes": "Initial production release of NovaStore with curated catalogs, direct downloads, and Telegram submission workflows.",
+  "releaseNotes": "NovaStore v2.0.0 is required. All previous APK versions have been deprecated. Please download and install the new v2.0.0 APK to continue.",
   "telegramBotUrl": "https://t.me/novastoreapk",
   "admin": {
     "username": "admin",

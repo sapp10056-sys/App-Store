@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -191,6 +192,44 @@ fun ForceUpdateScreen(
                 Text(
                     text = "Download & Install Update",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+
+            OutlinedButton(
+                onClick = {
+                    if (updateInfo.downloadUrl.isNotBlank()) {
+                        clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(updateInfo.downloadUrl))
+                        android.widget.Toast.makeText(context, "Download link copied!", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                },
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("force_update_copy_link_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Copy Download Link", fontWeight = FontWeight.SemiBold)
+            }
+
+            if (updateInfo.downloadUrl.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = updateInfo.downloadUrl,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
                 )
             }
 

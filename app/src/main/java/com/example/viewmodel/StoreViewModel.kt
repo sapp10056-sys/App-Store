@@ -17,8 +17,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 sealed class Screen {
     data object Disclaimer : Screen()
@@ -250,7 +257,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             if (!silent) _isCheckingUpdate.value = true
             try {
-                val result = updateChecker.checkForUpdate(currentVersionCode = 1)
+                val result = updateChecker.checkForUpdate(currentVersionCode = com.example.BuildConfig.VERSION_CODE)
                 _isRemoteLive.value = updateChecker.isRemoteLive
                 _updateSyncError.value = updateChecker.lastSyncError
 
@@ -283,6 +290,61 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         _updateInfo.value = null
+    }
+
+    fun publishCloudUpdateConfig(
+        downloadUrl: String,
+        latestVersionCode: Int = 2,
+        latestVersionName: String = "2.0.0",
+        minimumSupportedVersionCode: Int = 2,
+        releaseNotes: String = "NovaStore v2.0.0 is required. Please download and install the new APK version to continue using NovaStore.",
+        onComplete: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val json = JSONObject().apply {
+                    put("latestVersionCode", latestVersionCode)
+                    put("latestVersionName", latestVersionName)
+                    put("minimumSupportedVersionCode", minimumSupportedVersionCode)
+                    put("forceUpdate", false)
+                    put("downloadUrl", downloadUrl.trim())
+                    put("releaseNotes", releaseNotes.trim())
+                    put("telegramBotUrl", preferencesManager.getTelegramBotUrl())
+                    val adminObj = JSONObject().apply {
+                        put("username", preferencesManager.getAdminUsername())
+                        put("password", preferencesManager.getAdminPassword())
+                    }
+                    put("admin", adminObj)
+                    val admobObj = JSONObject().apply {
+                        put("enabled", preferencesManager.isAdMobEnabled())
+                        put("bannerAdUnitId", preferencesManager.getAdMobBannerUnitId())
+                        put("rewardedAdUnitId", preferencesManager.getAdMobRewardedUnitId())
+                    }
+                    put("admob", admobObj)
+                }
+
+                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                val body = json.toString().toRequestBody(mediaType)
+                val request = Request.Builder()
+                    .url("https://app-store-a9559-default-rtdb.asia-southeast1.firebasedatabase.app/appUpdate.json")
+                    .put(body)
+                    .build()
+
+                val client = OkHttpClient()
+                val response = client.newCall(request).execute()
+                val success = response.isSuccessful
+                if (success) {
+                    checkAppUpdates(silent = true)
+                }
+                withContext(Dispatchers.Main) {
+                    onComplete(success, if (success) null else "Server returned HTTP ${response.code}")
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onComplete(false, e.message)
+                }
+            }
+        }
     }
 
     // Admin Authentication against remote GitHub JSON config

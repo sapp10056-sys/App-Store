@@ -171,6 +171,12 @@ fun AdminScreen(
             }
 
     var customConfigUrl by remember { mutableStateOf(viewModel.preferencesManager.getUpdateConfigUrl()) }
+    var cloudDownloadUrl by remember { mutableStateOf("https://github.com/sapp10056-sys/App-Store/releases/latest") }
+    var cloudReleaseNotes by remember { mutableStateOf("NovaStore v2.0.0 is required. Please download and install the new APK version to continue using NovaStore.") }
+    var cloudMinVersion by remember { mutableStateOf("2") }
+    var cloudLatestVersionName by remember { mutableStateOf("2.0.0") }
+    var cloudLatestVersionCode by remember { mutableStateOf("2") }
+    var isPublishingCloud by remember { mutableStateOf(false) }
 
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
@@ -255,6 +261,110 @@ fun AdminScreen(
                                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(if (isChecking) "Checking..." else "Test Sync")
+                                }
+                            }
+                        }
+                    }
+
+                    // Live Cloud Force Update & Download Link Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Live Cloud Update & Download Link", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                "Publish download links and control Force Update live for all users instantly without needing to edit GitHub.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = cloudDownloadUrl,
+                                onValueChange = { cloudDownloadUrl = it },
+                                label = { Text("New APK Download Link (GitHub, Drive, Mediafire)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            OutlinedTextField(
+                                value = cloudReleaseNotes,
+                                onValueChange = { cloudReleaseNotes = it },
+                                label = { Text("Release Notes / User Notice") },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = cloudLatestVersionName,
+                                    onValueChange = { cloudLatestVersionName = it },
+                                    label = { Text("Version Name") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+
+                                OutlinedTextField(
+                                    value = cloudMinVersion,
+                                    onValueChange = { cloudMinVersion = it },
+                                    label = { Text("Min Build (Force)") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Button(
+                                onClick = {
+                                    isPublishingCloud = true
+                                    viewModel.publishCloudUpdateConfig(
+                                        downloadUrl = cloudDownloadUrl,
+                                        latestVersionCode = cloudLatestVersionCode.toIntOrNull() ?: 2,
+                                        latestVersionName = cloudLatestVersionName.ifBlank { "2.0.0" },
+                                        minimumSupportedVersionCode = cloudMinVersion.toIntOrNull() ?: 2,
+                                        releaseNotes = cloudReleaseNotes,
+                                        onComplete = { success, errorMsg ->
+                                            isPublishingCloud = false
+                                            if (success) {
+                                                Toast.makeText(context, "Cloud update published! Older APKs locked.", Toast.LENGTH_LONG).show()
+                                            } else {
+                                                Toast.makeText(context, "Error: $errorMsg", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    )
+                                },
+                                enabled = !isPublishingCloud,
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                if (isPublishingCloud) {
+                                    androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Publishing...")
+                                } else {
+                                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Publish Update to Cloud Now")
                                 }
                             }
                         }

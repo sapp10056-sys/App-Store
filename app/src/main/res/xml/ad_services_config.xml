@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ad-services-config>
+    <!-- Prevent AdServices Measurement/Topics null binding errors on unsupported emulators & devices -->
+    <attribution allowAllToAccess="false" />
+    <topics allowAllToAccess="false" />
+</ad-services-config>

@@ -56,4 +56,40 @@ class AppUpdateTest {
         assertTrue("When forceUpdate is true on GitHub, update must immediately trigger", shouldTrigger)
         assertTrue(updateInfo.forceUpdate)
     }
+
+    @Test
+    fun testDeprecatedV1ApkIsForcedToUpdateToV2() {
+        val oldApkVersionCode = 1
+        val v2UpdateInfo = AppUpdateInfo(
+            latestVersionCode = 2,
+            latestVersionName = "2.0.0",
+            minimumSupportedVersionCode = 2,
+            forceUpdate = false,
+            downloadUrl = "https://github.com/sapp10056-sys/App-Store/releases/latest"
+        )
+
+        val isEnforced = v2UpdateInfo.forceUpdate || (oldApkVersionCode < v2UpdateInfo.minimumSupportedVersionCode)
+        val shouldTrigger = v2UpdateInfo.latestVersionCode > oldApkVersionCode || isEnforced
+
+        assertTrue("Old v1 APK must be locked with force update", isEnforced)
+        assertTrue("Old v1 APK must trigger update prompt", shouldTrigger)
+    }
+
+    @Test
+    fun testNewV2ApkRunsNormallyWithoutUpdatePrompt() {
+        val newApkVersionCode = 2
+        val v2UpdateInfo = AppUpdateInfo(
+            latestVersionCode = 2,
+            latestVersionName = "2.0.0",
+            minimumSupportedVersionCode = 2,
+            forceUpdate = false,
+            downloadUrl = "https://github.com/sapp10056-sys/App-Store/releases/latest"
+        )
+
+        val isEnforced = v2UpdateInfo.forceUpdate || (newApkVersionCode < v2UpdateInfo.minimumSupportedVersionCode)
+        val shouldTrigger = v2UpdateInfo.latestVersionCode > newApkVersionCode || isEnforced
+
+        assertFalse("New v2 APK must NOT be locked", isEnforced)
+        assertFalse("New v2 APK must NOT trigger update prompt", shouldTrigger)
+    }
 }

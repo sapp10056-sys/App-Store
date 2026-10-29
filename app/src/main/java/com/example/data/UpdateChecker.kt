@@ -50,6 +50,9 @@ class UpdateChecker(
                 candidateUrls.add("https://api.github.com/repos/$owner/$repo/contents/$path?ref=$branch")
             }
 
+            // Firebase Realtime Database live cloud endpoint (instant real-time updates without caching)
+            candidateUrls.add("https://app-store-a9559-default-rtdb.asia-southeast1.firebasedatabase.app/appUpdate.json")
+
             var fetchedJsonString: String? = null
             var had404 = false
 
