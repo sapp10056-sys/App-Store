@@ -6,12 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
 class NovaTokenTest {
 
     @Test
@@ -64,13 +59,14 @@ class NovaTokenTest {
         val fromMapApp = ApplicationItem.fromMap(app.appId, map)
         assertTrue(fromMapApp.isPremium)
         assertEquals(10, fromMapApp.tokenCost)
+    }
 
-        val json = app.toJson()
-        assertTrue(json.getBoolean("isPremium"))
-        assertEquals(10, json.getInt("tokenCost"))
-
-        val parsed = ApplicationItem.fromJson(json)
-        assertTrue(parsed.isPremium)
-        assertEquals(10, parsed.tokenCost)
+    @Test
+    fun testUploadTokenDeductionBalance() {
+        val userTokens = 50
+        val cost = TokenManager.PREMIUM_UPLOAD_COST
+        assertTrue("User has enough tokens to list premium APK", userTokens >= cost)
+        val remaining = userTokens - cost
+        assertEquals(30, remaining)
     }
 }

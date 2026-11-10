@@ -1,14 +1,14 @@
 {
-  "latestVersionCode": 2,
-  "latestVersionName": "2.0.0",
-  "minimumSupportedVersionCode": 2,
+  "latestVersionCode": 3,
+  "latestVersionName": "3.0.0",
+  "minimumSupportedVersionCode": 3,
   "forceUpdate": false,
-  "downloadUrl": "https://github.com/sapp10056-sys/App-Store/releases/latest",
-  "releaseNotes": "NovaStore v2.0.0 is required. All previous APK versions have been deprecated. Please download and install the new v2.0.0 APK to continue.",
+  "downloadUrl": "https://t.me/novastoreapk/15",
+  "releaseNotes": "NovaStore v3.0.0 is mandatory! Purane sabhi APK versions band ho gaye hain. Naya APK download karein: Referral Code Rewards (20 Free Tokens), 30-day Validity Tracking, aur Live APK Upload Notifications!",
   "telegramBotUrl": "https://t.me/novastoreapk",
   "admin": {
-    "username": "admin",
-    "password": "admin1234"
+    "username": "nova",
+    "password": "techbk"
   },
   "admob": {
     "enabled": true,

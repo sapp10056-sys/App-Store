@@ -93,8 +93,8 @@ class PreferencesManager(context: Context) {
 
         const val DEFAULT_TELEGRAM_BOT_URL = "https://t.me/novastoreapk"
         const val DEFAULT_UPDATE_CONFIG_URL = "https://raw.githubusercontent.com/sapp10056-sys/App-Store/main/app-update.json"
-        const val DEFAULT_ADMIN_USERNAME = "admin"
-        const val DEFAULT_ADMIN_PASSWORD = "admin1234"
+        const val DEFAULT_ADMIN_USERNAME = "nova"
+        const val DEFAULT_ADMIN_PASSWORD = "techbk"
         const val DEFAULT_ADMOB_ENABLED = true
         const val DEFAULT_ADMOB_BANNER_UNIT_ID = "ca-app-pub-5220492832518267/6377280972"
         const val DEFAULT_ADMOB_REWARDED_UNIT_ID = "ca-app-pub-5220492832518267/1149712866"

@@ -64,6 +64,9 @@ class AppRepository(private val context: Context) {
     private var firestore: FirebaseFirestore? = null
     private var auth: FirebaseAuth? = null
     private var snapshotListener: ListenerRegistration? = null
+    private var tokenStatsListener: ListenerRegistration? = null
+    private val _totalTokensInCirculation = MutableStateFlow<Long>(0L)
+    val totalTokensInCirculation: StateFlow<Long> = _totalTokensInCirculation.asStateFlow()
     private var currentUserId: String = "guest_user"
 
     init {
@@ -156,6 +159,7 @@ class AppRepository(private val context: Context) {
             }
 
             listenToApplications()
+            listenToTokenStats()
         } catch (e: Exception) {
             Log.e(tag, "Firebase initialization error: ${e.message}", e)
             _isLoading.value = false
@@ -209,6 +213,80 @@ class AppRepository(private val context: Context) {
                 } else {
                     fetchFromRealtimeDatabase()
                 }
+            }
+    }
+
+    /**
+     * Listens to the 'tokenStats' document from Firestore to display Total Tokens in Circulation.
+     */
+    fun listenToTokenStats() {
+        val db = firestore ?: return
+        tokenStatsListener?.remove()
+
+        // 1. Listen to stats/tokenStats
+        tokenStatsListener = db.collection("stats").document("tokenStats")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(tag, "tokenStats listener notice: ${error.message}")
+                    return@addSnapshotListener
+                }
+                if (snapshot != null && snapshot.exists()) {
+                    val tokens = snapshot.getLong("totalTokensInCirculation")
+                        ?: snapshot.getLong("totalTokens")
+                        ?: snapshot.getLong("circulation")
+                        ?: snapshot.getDouble("totalTokensInCirculation")?.toLong()
+                        ?: 0L
+                    _totalTokensInCirculation.value = tokens
+                    Log.d(tag, "Loaded totalTokensInCirculation from Firestore stats/tokenStats: $tokens")
+                } else {
+                    // Fallback to tokenStats/tokenStats
+                    db.collection("tokenStats").document("tokenStats").get().addOnSuccessListener { altDoc1 ->
+                        if (altDoc1 != null && altDoc1.exists()) {
+                            val tokens = altDoc1.getLong("totalTokensInCirculation")
+                                ?: altDoc1.getLong("totalTokens")
+                                ?: altDoc1.getLong("circulation")
+                                ?: 0L
+                            _totalTokensInCirculation.value = tokens
+                        } else {
+                            // Fallback to tokenStats/summary
+                            db.collection("tokenStats").document("summary").get().addOnSuccessListener { altDoc2 ->
+                                if (altDoc2 != null && altDoc2.exists()) {
+                                    val tokens = altDoc2.getLong("totalTokensInCirculation")
+                                        ?: altDoc2.getLong("totalTokens")
+                                        ?: altDoc2.getLong("circulation")
+                                        ?: 0L
+                                    _totalTokensInCirculation.value = tokens
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+    }
+
+    /**
+     * Updates or syncs the tokenStats document in Firestore with the current tokens in circulation.
+     */
+    fun updateFirestoreTokenStats(totalCirculation: Long) {
+        val db = firestore ?: return
+        val data = mapOf(
+            "totalTokensInCirculation" to totalCirculation,
+            "updatedAt" to System.currentTimeMillis()
+        )
+        db.collection("stats").document("tokenStats").set(data)
+            .addOnSuccessListener {
+                Log.d(tag, "Updated tokenStats in stats/tokenStats: $totalCirculation")
+            }
+            .addOnFailureListener { e ->
+                Log.w(tag, "Failed to update stats/tokenStats: ${e.message}")
+            }
+
+        db.collection("tokenStats").document("tokenStats").set(data)
+            .addOnSuccessListener {
+                Log.d(tag, "Updated tokenStats in tokenStats/tokenStats: $totalCirculation")
+            }
+            .addOnFailureListener { e ->
+                Log.w(tag, "Failed to update tokenStats/tokenStats: ${e.message}")
             }
     }
 

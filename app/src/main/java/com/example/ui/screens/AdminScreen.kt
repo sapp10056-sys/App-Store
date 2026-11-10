@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,13 +28,25 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import com.example.data.TokenEconomySummary
+import com.example.data.DeveloperEarning
+import com.example.data.TokenTransaction
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -74,6 +87,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.model.ApplicationItem
 import com.example.ui.components.AppLogoImage
+import com.example.ui.theme.BadgeBlue
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.WarningAmber
@@ -99,6 +113,49 @@ fun AdminScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var editingApp by remember { mutableStateOf<ApplicationItem?>(null) }
     var deletingAppId by remember { mutableStateOf<String?>(null) }
+
+    var customConfigUrl by remember { mutableStateOf(viewModel.preferencesManager.getUpdateConfigUrl()) }
+    var cloudDownloadUrl by remember { mutableStateOf("https://github.com/sapp10056-sys/App-Store/releases/latest") }
+    var cloudReleaseNotes by remember { mutableStateOf("NovaStore v2.0.0 is required. Please download and install the new APK version to continue using NovaStore.") }
+    var cloudMinVersion by remember { mutableStateOf("2") }
+    var cloudLatestVersionName by remember { mutableStateOf("2.0.0") }
+    var cloudLatestVersionCode by remember { mutableStateOf("2") }
+    var isPublishingCloud by remember { mutableStateOf(false) }
+
+    var targetUserTokenId by remember { mutableStateOf("") }
+    var tokenAmountInput by remember { mutableStateOf("50") }
+    var inspectedUserBalance by remember { mutableStateOf<String?>(null) }
+    var isCreditingTokens by remember { mutableStateOf(false) }
+
+    val adminTokens by viewModel.adminTokens.collectAsState()
+    val totalTokensCirculation by viewModel.totalTokensInCirculation.collectAsState()
+    var economySummary by remember { mutableStateOf<TokenEconomySummary?>(null) }
+    var isLoadingEconomy by remember { mutableStateOf(false) }
+
+    fun refreshEconomyData() {
+        isLoadingEconomy = true
+        scope.launch {
+            val summary = viewModel.tokenManager.fetchTokenEconomyData(allApps)
+            economySummary = summary
+            isLoadingEconomy = false
+            val total = summary.totalTokensInCirculation.toLong()
+            if (total > 0L) {
+                viewModel.syncTokenStatsToFirestore(total)
+            }
+        }
+    }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 2) {
+            refreshEconomyData()
+        }
+    }
+
+    val displayTokensCirculation = when {
+        totalTokensCirculation > 0L -> totalTokensCirculation
+        (economySummary?.totalTokensInCirculation ?: 0) > 0 -> economySummary!!.totalTokensInCirculation.toLong()
+        else -> adminTokens.toLong()
+    }
 
     if (!isAdminLoggedIn) {
         Box(
@@ -159,44 +216,46 @@ fun AdminScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Stats Row
-            Row(
+            // Dashboard Stats Grid (Displays 'Total Tokens in Circulation' fetched from Firestore 'tokenStats' document)
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                AdminStatCard(
-                    title = "Total Apps",
-                    value = "${allApps.size}",
-                    modifier = Modifier.weight(1f)
-                )
-                AdminStatCard(
-                    title = "Flagged Apps",
-                    value = "${allApps.count { it.reportCount > 0 }}",
-                    modifier = Modifier.weight(1f)
-                )
-                AdminStatCard(
-                    title = "Admin User",
-                    value = viewModel.preferencesManager.getAdminUsername(),
-                    modifier = Modifier.weight(1f)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AdminStatCard(
+                        title = "Total Apps",
+                        value = "${allApps.size}",
+                        modifier = Modifier.weight(1f)
+                    )
+                    AdminStatCard(
+                        title = "Tokens in Circulation",
+                        value = "🪙 $displayTokensCirculation",
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("admin_stat_tokens_circulation")
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AdminStatCard(
+                        title = "Flagged Apps",
+                        value = "${allApps.count { it.reportCount > 0 }}",
+                        modifier = Modifier.weight(1f)
+                    )
+                    AdminStatCard(
+                        title = "Admin User",
+                        value = viewModel.preferencesManager.getAdminUsername(),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
-
-    var customConfigUrl by remember { mutableStateOf(viewModel.preferencesManager.getUpdateConfigUrl()) }
-    var cloudDownloadUrl by remember { mutableStateOf("https://github.com/sapp10056-sys/App-Store/releases/latest") }
-    var cloudReleaseNotes by remember { mutableStateOf("NovaStore v2.0.0 is required. Please download and install the new APK version to continue using NovaStore.") }
-    var cloudMinVersion by remember { mutableStateOf("2") }
-    var cloudLatestVersionName by remember { mutableStateOf("2.0.0") }
-    var cloudLatestVersionCode by remember { mutableStateOf("2") }
-    var isPublishingCloud by remember { mutableStateOf(false) }
-
-    var targetUserTokenId by remember { mutableStateOf("") }
-    var tokenAmountInput by remember { mutableStateOf("50") }
-    var inspectedUserBalance by remember { mutableStateOf<String?>(null) }
-    var isCreditingTokens by remember { mutableStateOf(false) }
-
-    val adminTokens by viewModel.adminTokens.collectAsState()
 
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
@@ -230,49 +289,424 @@ fun AdminScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Admin Wallet Card
+                    // 1. Token Economy Monitor & Circulation Card
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_token_economy_card"),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                     ) {
                         Column(modifier = Modifier.padding(18.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.MonetizationOn,
-                                    contentDescription = null,
-                                    tint = WarningAmber,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "Admin Platform Wallet",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MonetizationOn,
+                                        contentDescription = null,
+                                        tint = WarningAmber,
+                                        modifier = Modifier.size(28.dp)
                                     )
-                                    Text(
-                                        text = "3 Tokens collected per premium download",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "Token Economy Monitor",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                        Text(
+                                            text = "Total circulation & live platform liquidity",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = { refreshEconomyData() },
+                                    modifier = Modifier.testTag("admin_refresh_economy_btn")
+                                ) {
+                                    if (isLoadingEconomy) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            strokeWidth = 2.dp
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Refresh Economy",
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(14.dp))
 
+                            // 3 Key Metrics Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text(
+                                            text = "Circulation",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "🪙 $displayTokensCirculation",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "Firestore: stats/tokenStats",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text(
+                                            text = "Admin Wallet",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "🪙 ${economySummary?.adminWalletBalance ?: adminTokens}",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                            color = WarningAmber
+                                        )
+                                        Text(
+                                            text = "3 tokens/download",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text(
+                                            text = "Active Wallets",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "${economySummary?.activeWalletsCount ?: 1}",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "User Accounts",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Top-Earning Developers Card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_top_developers_card"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "🪙 $adminTokens",
-                                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                Icon(
+                                    imageVector = Icons.Default.TrendingUp,
+                                    contentDescription = null,
+                                    tint = SuccessGreen,
+                                    modifier = Modifier.size(22.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Total Collected Tokens",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                Column {
+                                    Text(
+                                        text = "Top-Earning Developers",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                    Text(
+                                        text = "Ranked by download reward split (7 tokens per premium download)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            val topDevs = economySummary?.topDevelopers ?: emptyList()
+                            if (isLoadingEconomy && topDevs.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                }
+                            } else if (topDevs.isEmpty()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "No developer earnings recorded yet. When users download a premium app (10 tokens), the developer automatically earns 7 tokens here.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                }
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    topDevs.take(5).forEachIndexed { index, dev ->
+                                        val rankColor = when (index) {
+                                            0 -> Color(0xFFF59E0B) // Gold
+                                            1 -> Color(0xFF94A3B8) // Silver
+                                            2 -> Color(0xFFD97706) // Bronze
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Rank Badge
+                                                Surface(
+                                                    color = rankColor.copy(alpha = 0.2f),
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text(
+                                                            text = "#${index + 1}",
+                                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                                            color = rankColor
+                                                        )
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.width(10.dp))
+
+                                                // Dev info
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = dev.developerName.ifBlank { "Developer" },
+                                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = "${dev.developerId} • ${dev.premiumAppsCount} premium app(s)",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+
+                                                Spacer(modifier = Modifier.width(8.dp))
+
+                                                // Earnings
+                                                Text(
+                                                    text = "🪙 ${dev.totalTokensEarned}",
+                                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
+                                                    color = SuccessGreen
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Recent Token Transactions Card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_recent_transactions_card"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.History,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Recent Token Transactions",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                    Text(
+                                        text = "Live audit log of credits, premium uploads & downloads",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            val txList = economySummary?.recentTransactions ?: emptyList()
+                            if (isLoadingEconomy && txList.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                }
+                            } else if (txList.isEmpty()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "No transactions logged yet. When users purchase tokens, upload premium APKs, or download premium apps, all transactions are recorded in real-time.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                }
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    txList.take(8).forEach { tx ->
+                                        val (badgeText, badgeBg, badgeTextColor) = when (tx.type) {
+                                            "ADMIN_CREDIT" -> Triple("+ CREDIT", SuccessGreen.copy(alpha = 0.15f), SuccessGreen)
+                                            "PREMIUM_UPLOAD" -> Triple("UPLOAD FEE", WarningAmber.copy(alpha = 0.15f), WarningAmber)
+                                            "PREMIUM_DOWNLOAD" -> Triple("DOWNLOAD", BadgeBlue.copy(alpha = 0.15f), BadgeBlue)
+                                            else -> Triple(tx.type.ifBlank { "TX" }, MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+
+                                        val formattedDate = try {
+                                            val sdf = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
+                                            sdf.format(Date(tx.timestamp))
+                                        } catch (e: Exception) {
+                                            ""
+                                        }
+
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Type Tag
+                                                Surface(
+                                                    color = badgeBg,
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = badgeText,
+                                                        style = MaterialTheme.typography.labelSmall.copy(
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 10.sp
+                                                        ),
+                                                        color = badgeTextColor,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+
+                                                Spacer(modifier = Modifier.width(8.dp))
+
+                                                // Description
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = when {
+                                                            tx.appName?.isNotBlank() == true -> tx.appName
+                                                            tx.note.isNotBlank() -> tx.note
+                                                            else -> "User: ${tx.userId}"
+                                                        },
+                                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = listOfNotNull(
+                                                            tx.userId.takeIf { it.isNotBlank() },
+                                                            formattedDate.takeIf { it.isNotBlank() }
+                                                        ).joinToString(" • "),
+                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+
+                                                Spacer(modifier = Modifier.width(6.dp))
+
+                                                // Amount
+                                                Text(
+                                                    text = when (tx.type) {
+                                                        "ADMIN_CREDIT" -> "+${tx.amount}"
+                                                        "PREMIUM_UPLOAD" -> "-${tx.amount}"
+                                                        "PREMIUM_DOWNLOAD" -> "${tx.amount}"
+                                                        else -> "${tx.amount}"
+                                                    } + " 🪙",
+                                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                                    color = when (tx.type) {
+                                                        "ADMIN_CREDIT" -> SuccessGreen
+                                                        "PREMIUM_UPLOAD" -> WarningAmber
+                                                        else -> MaterialTheme.colorScheme.primary
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

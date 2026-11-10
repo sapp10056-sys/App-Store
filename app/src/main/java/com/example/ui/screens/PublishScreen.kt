@@ -1,7 +1,9 @@
 package com.example.ui.screens
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
@@ -79,6 +82,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -131,6 +135,10 @@ fun PublishScreen(
     val allApps by viewModel.repository.applications.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        viewModel.tokenManager.syncFromCloud()
+    }
 
     // 3-Step Wizard state: 1 = Login/Auth, 2 = Details Form, 3 = Congratulations
     var currentStep by remember(form.submissionSuccess) {
@@ -1057,16 +1065,83 @@ private fun PublishPage2Details(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 6. Direct APK Download Link
+        // 6. Direct DevUploads APK Link via @DevUploadsUploaderBot
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    openDevUploadsBot(context)
+                }
+                .testTag("btn_open_devuploads_bot"),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudUpload,
+                        contentDescription = "Upload APK via Telegram",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Upload APK to @DevUploadsUploaderBot",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "Touch here to send APK to bot & create DevUploads download link",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         OutlinedTextField(
             value = form.downloadUrl,
             onValueChange = { viewModel.updatePublishDownloadUrl(it) },
-            label = { Text("Direct APK Download URL (HTTPS / Telegram) *") },
-            placeholder = { Text("https://t.me/... or https://devuploads.com/...") },
+            label = { Text("DevUploads APK Download URL *") },
+            placeholder = { Text("https://devuploads.com/xxxxxxxxx") },
             isError = form.downloadUrl.isNotEmpty() && !form.isDownloadUrlValid,
             supportingText = {
                 if (form.downloadUrl.isNotEmpty() && !form.isDownloadUrlValid) {
-                    Text("Valid HTTPS or Telegram download link required", color = MaterialTheme.colorScheme.error)
+                    Text(
+                        "Only DevUploads links are accepted! Touch the card above to upload your APK via @DevUploadsUploaderBot.",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text("Must be a DevUploads link (e.g. https://devuploads.com/...)")
+                }
+            },
+            trailingIcon = {
+                IconButton(onClick = { openDevUploadsBot(context) }) {
+                    Icon(
+                        imageVector = Icons.Default.CloudUpload,
+                        contentDescription = "Open @DevUploadsUploaderBot",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
             },
             modifier = Modifier.fillMaxWidth().testTag("input_download_url"),
@@ -1678,3 +1753,28 @@ private fun PublishPage3Congratulations(
         Spacer(modifier = Modifier.height(40.dp))
     }
 }
+
+/**
+ * Opens Telegram bot @DevUploadsUploaderBot for users to create/upload APK download link.
+ */
+fun openDevUploadsBot(context: Context) {
+    val botUsername = "DevUploadsUploaderBot"
+    val telegramDeepLink = "tg://resolve?domain=$botUsername"
+    val webFallback = "https://t.me/$botUsername"
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(telegramDeepLink)).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        try {
+            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse(webFallback)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(webIntent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Please open Telegram and message @$botUsername to upload your APK", Toast.LENGTH_LONG).show()
+        }
+    }
+}
+
