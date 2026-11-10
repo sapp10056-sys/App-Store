@@ -36,6 +36,8 @@ data class ApplicationItem(
     val downloadCount: Long = 1200L,
     val isFeatured: Boolean = false,
     val isTrending: Boolean = false,
+    val isPremium: Boolean = false,
+    val tokenCost: Int = 10,
     val versions: List<AppVersionItem> = emptyList()
 ) {
     /**
@@ -86,6 +88,8 @@ data class ApplicationItem(
             "downloadCount" to downloadCount,
             "isFeatured" to isFeatured,
             "isTrending" to isTrending,
+            "isPremium" to isPremium,
+            "tokenCost" to tokenCost,
             "versions" to versionsList
         )
     }
@@ -123,6 +127,8 @@ data class ApplicationItem(
         json.put("downloadCount", downloadCount)
         json.put("isFeatured", isFeatured)
         json.put("isTrending", isTrending)
+        json.put("isPremium", isPremium)
+        json.put("tokenCost", tokenCost)
 
         val vArr = JSONArray()
         getAllVersions().forEach { vArr.put(it.toJson()) }
@@ -191,6 +197,8 @@ data class ApplicationItem(
                 downloadCount = (map["downloadCount"] as? Number)?.toLong() ?: 1200L,
                 isFeatured = (map["isFeatured"] as? Boolean) ?: false,
                 isTrending = (map["isTrending"] as? Boolean) ?: false,
+                isPremium = (map["isPremium"] as? Boolean) ?: false,
+                tokenCost = (map["tokenCost"] as? Number)?.toInt() ?: if ((map["isPremium"] as? Boolean) == true) 10 else 0,
                 versions = parsedVersions
             )
         }
@@ -231,6 +239,9 @@ data class ApplicationItem(
                 )
             }
 
+            val isPrem = json.optBoolean("isPremium", false)
+            val cost = json.optInt("tokenCost", if (isPrem) 10 else 0)
+
             return ApplicationItem(
                 appId = json.optString("appId"),
                 appName = json.optString("appName"),
@@ -259,6 +270,8 @@ data class ApplicationItem(
                 downloadCount = json.optLong("downloadCount", 1200L),
                 isFeatured = json.optBoolean("isFeatured", false),
                 isTrending = json.optBoolean("isTrending", false),
+                isPremium = isPrem,
+                tokenCost = cost,
                 versions = parsedVersions
             )
         }

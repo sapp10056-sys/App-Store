@@ -55,6 +55,8 @@ data class PublishFormState(
     val hasDistributionRights: Boolean = false,
     val isInfoAccurate: Boolean = false,
     val agreesToRules: Boolean = false,
+    val isPremium: Boolean = false,
+    val tokenCost: Int = 10,
     val isSubmitting: Boolean = false,
     val submissionError: String? = null,
     val submissionSuccess: Boolean = false,
@@ -88,7 +90,18 @@ data class PublishFormState(
 class StoreViewModel(application: Application) : AndroidViewModel(application) {
     val preferencesManager = PreferencesManager(application)
     val repository = AppRepository(application)
+    val tokenManager = com.example.data.TokenManager(application)
     private val updateChecker = UpdateChecker(application, preferencesManager)
+
+    val userTokens = tokenManager.userTokens
+    val adminTokens = tokenManager.adminTokens
+    val unlockedAppIds = tokenManager.unlockedAppIds
+
+    private val _showTokenWallet = MutableStateFlow(false)
+    val showTokenWallet: StateFlow<Boolean> = _showTokenWallet.asStateFlow()
+
+    private val _pendingPremiumUnlockApp = MutableStateFlow<ApplicationItem?>(null)
+    val pendingPremiumUnlockApp: StateFlow<ApplicationItem?> = _pendingPremiumUnlockApp.asStateFlow()
 
     private val _currentScreen = MutableStateFlow<Screen>(
         if (preferencesManager.isDisclaimerAccepted()) Screen.Home else Screen.Disclaimer
@@ -224,7 +237,33 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun requestDownload(app: ApplicationItem) {
+        if (app.isPremium && !tokenManager.isAppUnlocked(app.appId)) {
+            _pendingPremiumUnlockApp.value = app
+        } else {
+            _pendingDownloadApp.value = app
+        }
+    }
+
+    fun dismissPremiumUnlockDialog() {
+        _pendingPremiumUnlockApp.value = null
+    }
+
+    fun onPremiumUnlocked(app: ApplicationItem) {
+        _pendingPremiumUnlockApp.value = null
         _pendingDownloadApp.value = app
+    }
+
+    fun openTokenWallet() {
+        tokenManager.syncFromCloud()
+        _showTokenWallet.value = true
+    }
+
+    fun dismissTokenWallet() {
+        _showTokenWallet.value = false
+    }
+
+    fun exportApplicationsToCsv(context: android.content.Context) {
+        com.example.util.CsvExportHelper.exportApplicationsToCsv(context, repository.applications.value)
     }
 
     fun dismissDownloadDialog() {
@@ -471,68 +510,90 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleDistributionRights(checked: Boolean) { _publishForm.value = _publishForm.value.copy(hasDistributionRights = checked) }
     fun toggleInfoAccurate(checked: Boolean) { _publishForm.value = _publishForm.value.copy(isInfoAccurate = checked) }
     fun toggleAgreesToRules(checked: Boolean) { _publishForm.value = _publishForm.value.copy(agreesToRules = checked) }
+    fun togglePublishPremium(isPremium: Boolean) { _publishForm.value = _publishForm.value.copy(isPremium = isPremium) }
 
     fun submitPublishForm(onSuccess: () -> Unit) {
         val form = _publishForm.value
         if (!form.isFormValid) return
 
         val activeDev = repository.developerSessionManager.currentDeveloper.value
+        val devId = activeDev?.developerId ?: tokenManager.userId
 
         _publishForm.value = form.copy(isSubmitting = true, submissionError = null)
-        viewModelScope.launch {
-            val normalizedDownload = when {
-                form.downloadUrl.trim().startsWith("http://", ignoreCase = true) ||
-                form.downloadUrl.trim().startsWith("https://", ignoreCase = true) -> form.downloadUrl.trim()
-                form.downloadUrl.trim().isNotEmpty() -> "https://" + form.downloadUrl.trim()
-                else -> "https://t.me/novastoreapk"
-            }
 
-            val normalizedLogo = when {
-                form.logoUrl.trim().startsWith("http://", ignoreCase = true) ||
-                form.logoUrl.trim().startsWith("https://", ignoreCase = true) -> form.logoUrl.trim()
-                form.logoUrl.trim().isNotEmpty() -> "https://" + form.logoUrl.trim()
-                else -> "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=256&auto=format&fit=crop&q=80"
-            }
+        val executePublish = {
+            viewModelScope.launch {
+                val normalizedDownload = when {
+                    form.downloadUrl.trim().startsWith("http://", ignoreCase = true) ||
+                    form.downloadUrl.trim().startsWith("https://", ignoreCase = true) -> form.downloadUrl.trim()
+                    form.downloadUrl.trim().isNotEmpty() -> "https://" + form.downloadUrl.trim()
+                    else -> "https://t.me/novastoreapk"
+                }
 
-            val app = ApplicationItem(
-                appId = form.targetAppId ?: "",
-                appName = form.appName.trim(),
-                developerId = activeDev?.developerId ?: "",
-                developerName = activeDev?.developerName ?: form.developerName.trim(),
-                developerEmail = "",
-                logoUrl = normalizedLogo,
-                shortDescription = form.shortDescription.trim(),
-                fullDescription = form.fullDescription.trim(),
-                category = form.category,
-                versionName = form.versionName.trim(),
-                versionCode = form.versionCode.toLongOrNull() ?: 1L,
-                minAndroidVersion = form.minAndroidVersion,
-                downloadUrl = normalizedDownload,
-                privacyPolicyUrl = "",
-                supportUrl = form.supportUrl.trim(),
-                permissionsDisclosure = form.permissionsDisclosure.trim(),
-                screenshotUrls = form.screenshotUrls,
-                publicationStatus = "published"
-            )
+                val normalizedLogo = when {
+                    form.logoUrl.trim().startsWith("http://", ignoreCase = true) ||
+                    form.logoUrl.trim().startsWith("https://", ignoreCase = true) -> form.logoUrl.trim()
+                    form.logoUrl.trim().isNotEmpty() -> "https://" + form.logoUrl.trim()
+                    else -> "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=256&fm=webp&fit=crop&q=80"
+                }
 
-            val result = repository.publishApplication(app, activeDev)
-            result.onSuccess { publishedId ->
-                val publishedApp = app.copy(
-                    appId = publishedId,
-                    developerId = activeDev?.developerId ?: app.developerId,
-                    developerName = activeDev?.developerName ?: app.developerName
+                val app = ApplicationItem(
+                    appId = form.targetAppId ?: "",
+                    appName = form.appName.trim(),
+                    developerId = devId,
+                    developerName = activeDev?.developerName ?: form.developerName.trim(),
+                    developerEmail = "",
+                    logoUrl = normalizedLogo,
+                    shortDescription = form.shortDescription.trim(),
+                    fullDescription = form.fullDescription.trim(),
+                    category = form.category,
+                    versionName = form.versionName.trim(),
+                    versionCode = form.versionCode.toLongOrNull() ?: 1L,
+                    minAndroidVersion = form.minAndroidVersion,
+                    downloadUrl = normalizedDownload,
+                    privacyPolicyUrl = "",
+                    supportUrl = form.supportUrl.trim(),
+                    permissionsDisclosure = form.permissionsDisclosure.trim(),
+                    screenshotUrls = form.screenshotUrls,
+                    publicationStatus = "published",
+                    isPremium = form.isPremium,
+                    tokenCost = if (form.isPremium) 10 else 0
                 )
-                _publishForm.value = PublishFormState(
-                    submissionSuccess = true,
-                    lastPublishedApp = publishedApp
-                )
-                onSuccess()
-            }.onFailure { err ->
-                _publishForm.value = _publishForm.value.copy(
-                    isSubmitting = false,
-                    submissionError = err.message ?: "Failed to publish listing"
-                )
+
+                val result = repository.publishApplication(app, activeDev)
+                result.onSuccess { publishedId ->
+                    val publishedApp = app.copy(
+                        appId = publishedId,
+                        developerId = devId,
+                        developerName = activeDev?.developerName ?: app.developerName
+                    )
+                    _publishForm.value = PublishFormState(
+                        submissionSuccess = true,
+                        lastPublishedApp = publishedApp
+                    )
+                    onSuccess()
+                }.onFailure { err ->
+                    _publishForm.value = _publishForm.value.copy(
+                        isSubmitting = false,
+                        submissionError = err.message ?: "Failed to publish listing"
+                    )
+                }
             }
+        }
+
+        if (form.isPremium) {
+            tokenManager.deductForPremiumUpload(devId) { success, msg ->
+                if (success) {
+                    executePublish()
+                } else {
+                    _publishForm.value = form.copy(
+                        isSubmitting = false,
+                        submissionError = msg
+                    )
+                }
+            }
+        } else {
+            executePublish()
         }
     }
 

@@ -62,11 +62,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -1255,6 +1257,103 @@ private fun PublishPage2Details(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        val userTokens by viewModel.userTokens.collectAsState()
+        val context = androidx.compose.ui.platform.LocalContext.current
+
+        // PREMIUM APK LISTING SELECTOR (20 Nova Tokens)
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (form.isPremium) WarningAmber.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ),
+            shape = RoundedCornerShape(12.dp),
+            border = if (form.isPremium) androidx.compose.foundation.BorderStroke(1.5.dp, WarningAmber) else null,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.MonetizationOn,
+                                contentDescription = null,
+                                tint = if (form.isPremium) WarningAmber else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Premium APK Listing",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Text(
+                            text = if (form.isPremium) "Premium APK: Requires 20 Nova Tokens to list" else "Standard Free App (0 Tokens to list)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (form.isPremium) WarningAmber else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Switch(
+                        checked = form.isPremium,
+                        onCheckedChange = { viewModel.togglePublishPremium(it) },
+                        modifier = Modifier.testTag("switch_premium_listing")
+                    )
+                }
+
+                if (form.isPremium) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        color = WarningAmber.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "• Listing Fee: 20 Nova Tokens will be charged upon publishing.",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = WarningAmber
+                            )
+                            Text(
+                                text = "• User Download Cost: Users pay 10 tokens to download (7 tokens go to your account, 3 tokens platform fee).",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Your Balance: 🪙 $userTokens Tokens",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (userTokens >= 20) SuccessGreen else MaterialTheme.colorScheme.error
+                                )
+
+                                if (userTokens < 20) {
+                                    OutlinedButton(
+                                        onClick = { viewModel.openTokenWallet() },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(30.dp)
+                                    ) {
+                                        Text("Buy Tokens", fontSize = 10.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // MANDATORY AUTHORIZATIONS
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
@@ -1294,6 +1393,34 @@ private fun PublishPage2Details(
             }
         }
 
+        // Submission Error Alert Banner
+        if (form.submissionError != null) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Error",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = form.submissionError,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         // UPLOAD & PUBLISH BUTTON
@@ -1303,9 +1430,11 @@ private fun PublishPage2Details(
                     onPublishSuccess()
                 }
             },
-            enabled = form.isFormValid && !form.isSubmitting,
+            enabled = form.isFormValid && !form.isSubmitting && (!form.isPremium || userTokens >= 20),
             shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (form.isPremium) WarningAmber else MaterialTheme.colorScheme.primary
+            ),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp)
@@ -1316,11 +1445,22 @@ private fun PublishPage2Details(
                 Spacer(modifier = Modifier.width(10.dp))
                 Text("Uploading & Syncing to Store Catalog...", fontWeight = FontWeight.Bold)
             } else {
-                Icon(Icons.Default.CloudDone, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(
+                    imageVector = Icons.Default.CloudDone,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (form.isPremium) Color.Black else Color.White
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (form.isFormValid) "Upload & Publish APK Now" else "Complete Required Fields & Checkboxes",
-                    fontWeight = FontWeight.Bold
+                    text = when {
+                        !form.isFormValid -> "Complete Required Fields & Checkboxes"
+                        form.isPremium && userTokens < 20 -> "Insufficient Tokens (Need 20 Tokens)"
+                        form.isPremium -> "Upload & Publish Premium APK (🪙 20 Tokens)"
+                        else -> "Upload & Publish APK Now"
+                    },
+                    fontWeight = FontWeight.Bold,
+                    color = if (form.isPremium) Color.Black else Color.White
                 )
             }
         }

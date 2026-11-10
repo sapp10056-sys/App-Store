@@ -54,6 +54,11 @@ object ImageUrlResolver {
             url = "https://$url"
         }
 
+        // Avoid AVIF/HEIF format negotiation on emulators and older Android versions
+        if (url.contains("auto=format")) {
+            url = url.replace("auto=format", "fm=webp")
+        }
+
         // Check cache first
         resolvedCache[url]?.let { return it }
 
@@ -181,11 +186,11 @@ object ImageUrlResolver {
      */
     fun getPresetIcon(category: String): String {
         return when (category.lowercase()) {
-            "games" -> "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=256&auto=format&fit=crop&q=80"
-            "entertainment", "media" -> "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=256&auto=format&fit=crop&q=80"
-            "communication", "social" -> "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=256&auto=format&fit=crop&q=80"
-            "productivity" -> "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=256&auto=format&fit=crop&q=80"
-            else -> "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=256&auto=format&fit=crop&q=80" // Modern blue/purple abstract 3D icon
+            "games" -> "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=256&fm=webp&fit=crop&q=80"
+            "entertainment", "media" -> "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=256&fm=webp&fit=crop&q=80"
+            "communication", "social" -> "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=256&fm=webp&fit=crop&q=80"
+            "productivity" -> "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=256&fm=webp&fit=crop&q=80"
+            else -> "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=256&fm=webp&fit=crop&q=80" // Modern blue/purple abstract 3D icon
         }
     }
 }

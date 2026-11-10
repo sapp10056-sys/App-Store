@@ -641,7 +641,7 @@ class AppRepository(private val context: Context) {
                 appName = "VLC Media Player",
                 developerName = "VideoLAN Organization",
                 developerEmail = "support@videolan.org",
-                logoUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=256&auto=format&fit=crop&q=80",
+                logoUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=256&fm=webp&fit=crop&q=80",
                 shortDescription = "The versatile open-source cross-platform multimedia player for Android.",
                 fullDescription = "VLC for Android plays most local video and audio files, network streams (including adaptive streaming), and DVD ISOs. Supports multi-track audio and subtitles, auto-rotation, aspect-ratio adjustments, and volume/brightness gestures.",
                 category = "Entertainment",
@@ -653,8 +653,8 @@ class AppRepository(private val context: Context) {
                 supportUrl = "https://forum.videolan.org",
                 permissionsDisclosure = "READ_MEDIA_VIDEO, READ_MEDIA_AUDIO, FOREGROUND_SERVICE for media playback.",
                 screenshotUrls = listOf(
-                    "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=600&auto=format&fit=crop&q=80",
-                    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=80"
+                    "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=600&fm=webp&fit=crop&q=80",
+                    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&fm=webp&fit=crop&q=80"
                 ),
                 rating = 4.9f,
                 downloadCount = 45000L,
@@ -666,7 +666,7 @@ class AppRepository(private val context: Context) {
                 appName = "K-9 Mail (Thunderbird)",
                 developerName = "MZLA Technologies",
                 developerEmail = "k9mail@thunderbird.net",
-                logoUrl = "https://images.unsplash.com/photo-1557200134-90327ee9fafa?w=256&auto=format&fit=crop&q=80",
+                logoUrl = "https://images.unsplash.com/photo-1557200134-90327ee9fafa?w=256&fm=webp&fit=crop&q=80",
                 shortDescription = "Open source, privacy-focused email client for personal and business mail.",
                 fullDescription = "K-9 Mail is an independent, community-driven email client for Android supporting IMAP, POP3, and Exchange (WebDAV). Built with respect for your privacy and no third-party tracking.",
                 category = "Communication",
@@ -678,7 +678,7 @@ class AppRepository(private val context: Context) {
                 supportUrl = "https://forum.k9mail.app",
                 permissionsDisclosure = "INTERNET, RECEIVE_BOOT_COMPLETED, POST_NOTIFICATIONS.",
                 screenshotUrls = listOf(
-                    "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80"
+                    "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&fm=webp&fit=crop&q=80"
                 ),
                 rating = 4.7f,
                 downloadCount = 31000L,
@@ -690,7 +690,7 @@ class AppRepository(private val context: Context) {
                 appName = "Aegis Authenticator",
                 developerName = "Aegis Open Source Team",
                 developerEmail = "alex@aegis-auth.org",
-                logoUrl = "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=256&auto=format&fit=crop&q=80",
+                logoUrl = "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=256&fm=webp&fit=crop&q=80",
                 shortDescription = "Free, secure and open-source 2FA authenticator with encrypted backups.",
                 fullDescription = "Aegis Authenticator is a secure, encrypted app for managing your two-factor authentication tokens (TOTP & HOTP). Features biometric unlock, automatic encrypted backups, and custom grouping.",
                 category = "Tools",
@@ -702,7 +702,7 @@ class AppRepository(private val context: Context) {
                 supportUrl = "https://github.com/beemdevelopment/Aegis",
                 permissionsDisclosure = "CAMERA (optional for QR scanning), USE_BIOMETRIC.",
                 screenshotUrls = listOf(
-                    "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&auto=format&fit=crop&q=80"
+                    "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&fm=webp&fit=crop&q=80"
                 ),
                 rating = 4.9f,
                 downloadCount = 52000L,
@@ -714,7 +714,7 @@ class AppRepository(private val context: Context) {
                 appName = "Obsidian Markdown Notes",
                 developerName = "Dynalist Inc.",
                 developerEmail = "support@obsidian.md",
-                logoUrl = "https://images.unsplash.com/photo-1517842645767-c639042777db?w=256&auto=format&fit=crop&q=80",
+                logoUrl = "https://images.unsplash.com/photo-1517842645767-c639042777db?w=256&fm=webp&fit=crop&q=80",
                 shortDescription = "Sharpen your thinking. The extensible knowledge base on plain text Markdown.",
                 fullDescription = "Obsidian is a powerful knowledge base on top of a local folder of plain text Markdown files. Connect ideas with bidirectional links, graph view, and extensive plugins.",
                 category = "Productivity",
@@ -726,7 +726,7 @@ class AppRepository(private val context: Context) {
                 supportUrl = "https://forum.obsidian.md",
                 permissionsDisclosure = "INTERNET, ACCESS_NETWORK_STATE.",
                 screenshotUrls = listOf(
-                    "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=600&auto=format&fit=crop&q=80"
+                    "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=600&fm=webp&fit=crop&q=80"
                 ),
                 rating = 4.8f,
                 downloadCount = 68000L,
@@ -738,7 +738,7 @@ class AppRepository(private val context: Context) {
                 appName = "SuperTuxKart Racing",
                 developerName = "SuperTuxKart Team",
                 developerEmail = "contact@supertuxkart.net",
-                logoUrl = "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=256&auto=format&fit=crop&q=80",
+                logoUrl = "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=256&fm=webp&fit=crop&q=80",
                 shortDescription = "High-octane 3D open-source arcade kart racing with realistic physics.",
                 fullDescription = "SuperTuxKart is a 3D open-source arcade kart racer with a variety of characters, tracks, and modes to play. Experience story mode, single-player Grand Prix, and online multiplayer races.",
                 category = "Games",
@@ -750,7 +750,7 @@ class AppRepository(private val context: Context) {
                 supportUrl = "https://supertuxkart.net/Community",
                 permissionsDisclosure = "INTERNET, VIBRATE, WAKE_LOCK.",
                 screenshotUrls = listOf(
-                    "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=600&auto=format&fit=crop&q=80"
+                    "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=600&fm=webp&fit=crop&q=80"
                 ),
                 rating = 4.6f,
                 downloadCount = 19000L,

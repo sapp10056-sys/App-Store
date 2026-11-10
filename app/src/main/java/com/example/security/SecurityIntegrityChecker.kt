@@ -16,15 +16,16 @@ import kotlin.system.exitProcess
 /**
  * SecurityIntegrityChecker
  *
- * Implements Google Play App Defense / Play Integrity style anti-tamper security:
- * 1. Package Name Integrity: Ensures package belongs to official NovaStore identifiers.
- * 2. Signature Verification: Validates APK signing certificate integrity.
- * 3. Anti-Sign-Kill Protection: Detects MT Manager / NP Manager signature-kill hooks,
- *    fake PackageManager proxies, and injected signature-bypass DEX/assets.
- * 4. Anti-Hooking & Anti-Debugging: Detects Frida, Xposed, Substrate, and debuggers.
- *
- * Designed to be 100% resilient for official GitHub Releases and updates while strictly
- * blocking modders who attempt to hook or bypass security.
+ * Implements strict military-grade anti-tamper and anti-sign-kill protection:
+ * 1. Package Name Integrity: Blocks modified package names.
+ * 2. Official Signature Integrity: Only the legitimate author signature is permitted.
+ *    Any re-signed APK (custom cert, testkey, modder cert) crashes immediately.
+ * 3. Anti-Sign-Kill Protection: Specifically catches MT Manager, NP Manager, and CorePatch
+ *    dynamic proxies (hooks on ActivityThread.sPackageManager or ApplicationPackageManager.mPM)
+ *    and injected signature-killer DEX/assets.
+ * 4. Anti-Hooking & Memory Scanning: Scans /proc/self/maps for Frida, Xposed, SandHook, Substrate.
+ * 5. Anti-Debugging: Detects JDWP debugger connection.
+ * 6. Fatal Crash: Uses Linux kernel SIGKILL and process termination if any violation is detected.
  */
 object SecurityIntegrityChecker {
     private const val TAG = "NovaSecurity"
@@ -36,12 +37,12 @@ object SecurityIntegrityChecker {
     )
 
     /** Known Official Build Signatures (SHA-256 in uppercase without colons) */
-    private val KNOWN_OFFICIAL_SIGNATURES = setOf(
-        // Debug container keystore
+    val KNOWN_OFFICIAL_SIGNATURES = setOf(
+        // Authoritative official build keystore
         "F4B6CFD322164BF6037A973F1B376B38357BCD66B7B7AA8AA0326AAF77DA544F"
     )
 
-    /** Known Modding Signatures (e.g. default Android testkey, MT Manager default cert) */
+    /** Known Public Modder Testkeys */
     private val KNOWN_MALICIOUS_MODDER_SIGNATURES = setOf(
         // Standard Android Open Source Project (AOSP) testkey
         "27184BE3D332B5887864B62D56B61E872F544FF2CA99CE2B1A0E4D0EDF3014F3",
@@ -51,7 +52,7 @@ object SecurityIntegrityChecker {
     /**
      * Verifies APK signature, package name, and anti-tamper integrity.
      * If signature mismatch from modding tools, sign-kill hook, or memory injection is detected,
-     * the app blocks execution and terminates.
+     * the app terminates instantly via kernel SIGKILL.
      */
     fun checkIntegrityOrCrash(context: Context) {
         if (isTestEnvironment()) {
@@ -65,20 +66,20 @@ object SecurityIntegrityChecker {
             // 1. Package Name Integrity Check
             val currentPackage = context.packageName
             if (!ALLOWED_PACKAGE_NAMES.contains(currentPackage)) {
-                criticalViolations.add("Package name hijacking detected: '$currentPackage' is not an authorized NovaStore package")
+                criticalViolations.add("Package name hijacking detected: '$currentPackage' is unauthorized")
             }
 
-            // 2. Anti-Sign-Kill Hook & Proxy Detection (MT Manager / NP Manager)
+            // 2. Anti-Sign-Kill Hook & Proxy Detection (MT Manager / NP Manager / CorePatch)
             if (isPackageManagerHooked(context)) {
                 criticalViolations.add("Kill-Signature dynamic proxy or PackageManager hook detected")
             }
 
-            // 3. Injected Modding Artifacts (Kill-Signature modules)
+            // 3. Injected Modding Artifacts (Kill-Signature modules & patched DEX)
             if (isSignKillArtifactPresent(context)) {
                 criticalViolations.add("Kill-Signature injection artifact or signature bypass module detected in APK")
             }
 
-            // 4. Memory Hooking Frameworks (Frida, Xposed, Substrate)
+            // 4. Memory Hooking Frameworks (Frida, Xposed, Substrate, SandHook)
             if (isHookingFrameworkLoaded()) {
                 criticalViolations.add("Hooking framework loaded in process memory (/proc/self/maps)")
             }
@@ -88,21 +89,33 @@ object SecurityIntegrityChecker {
                 criticalViolations.add("Reverse-engineering / modding classes present in classloader")
             }
 
-            // 6. Signature Verification: Ensure APK is legitimately signed and not signed by known testkeys
+            // 6. Anti-Debugging Check
+            if (isDebuggerAttached()) {
+                criticalViolations.add("Active debugger attached to application process")
+            }
+
+            // 7. Signature Verification: Must strictly match official build signature
             val signatures = getInstalledSignatures(context)
             if (signatures.isEmpty()) {
                 criticalViolations.add("No valid APK signing certificates found (Signature stripped or killed)")
             } else {
+                var foundOfficial = false
                 for (sig in signatures) {
                     val sha256 = computeSha256(sig)
                     if (KNOWN_MALICIOUS_MODDER_SIGNATURES.contains(sha256)) {
                         criticalViolations.add("APK is signed with a known public modder testkey: $sha256")
                         break
                     }
+                    if (KNOWN_OFFICIAL_SIGNATURES.contains(sha256)) {
+                        foundOfficial = true
+                    }
+                }
+                if (!foundOfficial) {
+                    criticalViolations.add("Unauthorized signature detected: APK has been re-signed or modded")
                 }
             }
 
-            // IF CRITICAL MODDING / TAMPERING DETECTED: TERMINATE PROCESS
+            // IF CRITICAL MODDING / SIGN-KILL / TAMPERING DETECTED: CRASH & TERMINATE PROCESS
             if (criticalViolations.isNotEmpty()) {
                 Log.e(TAG, "CRITICAL SECURITY VIOLATION: $criticalViolations")
                 triggerFatalTamperCrash("Security Integrity Violation: Unauthorized APK tampering detected. ($criticalViolations)")
@@ -112,7 +125,6 @@ object SecurityIntegrityChecker {
         } catch (e: SecurityException) {
             throw e
         } catch (e: Exception) {
-            // Log safe diagnostic without crashing legitimate builds on custom ROMs
             Log.w(TAG, "Integrity check diagnostic warning: ${e.message}")
         }
     }
@@ -156,7 +168,8 @@ object SecurityIntegrityChecker {
     }
 
     /**
-     * Detects if PackageManager has been hooked by Kill-Signature tools via dynamic proxy or reflection.
+     * Detects if PackageManager or ActivityThread.sPackageManager has been hooked by
+     * Kill-Signature tools via dynamic proxy or reflection (MT Manager, NP Manager, CorePatch).
      */
     private fun isPackageManagerHooked(context: Context): Boolean {
         try {
@@ -165,7 +178,7 @@ object SecurityIntegrityChecker {
                 return true
             }
             val pmClassName = pm.javaClass.name.lowercase()
-            if (pmClassName.contains("proxy") && (pmClassName.contains("hook") || pmClassName.contains("fake"))) {
+            if (pmClassName.contains("proxy") && (pmClassName.contains("hook") || pmClassName.contains("fake") || pmClassName.contains("kill"))) {
                 return true
             }
 
@@ -177,21 +190,35 @@ object SecurityIntegrityChecker {
             if (sPackageManager != null && java.lang.reflect.Proxy.isProxyClass(sPackageManager.javaClass)) {
                 return true
             }
+
+            // Check ApplicationPackageManager mPM internal interface proxy (MT Manager's target)
+            try {
+                val mPmField = pm.javaClass.getDeclaredField("mPM")
+                mPmField.isAccessible = true
+                val mPm = mPmField.get(pm)
+                if (mPm != null && java.lang.reflect.Proxy.isProxyClass(mPm.javaClass)) {
+                    return true
+                }
+            } catch (_: Exception) {}
         } catch (_: Exception) {}
         return false
     }
 
     /**
-     * Detects known signature-kill modules (MT Manager, NP Manager, CorePatch, etc.)
+     * Detects known signature-kill modules (MT Manager, NP Manager, CorePatch, SandHook, etc.)
      */
     private fun isSignKillArtifactPresent(context: Context): Boolean {
         val signKillClasses = listOf(
             "bin.mt.signature.Killer",
             "bin.mt.apksignaturekiller",
             "np.manager.signature",
+            "np.manager.ApkSignatureKiller",
             "com.google.android.gms.internal.KillSignature",
             "arm.stub.StubApp",
-            "com.swift.sandhook.SandHook"
+            "com.swift.sandhook.SandHook",
+            "me.weishu.epic.art.Epic",
+            "top.canyie.pine.Pine",
+            "andhook.lib.AndHook"
         )
         for (cls in signKillClasses) {
             try {
@@ -200,7 +227,7 @@ object SecurityIntegrityChecker {
             } catch (_: ClassNotFoundException) {}
         }
 
-        // Direct scan inside the APK zip for signature-killer injected files
+        // Direct scan inside the APK zip for signature-killer injected files & libs
         try {
             val apkPath = context.applicationInfo.sourceDir
             if (!apkPath.isNullOrBlank()) {
@@ -212,7 +239,11 @@ object SecurityIntegrityChecker {
                         val name = entries.nextElement().name.lowercase()
                         if (name.contains("kill_signature") ||
                             name.contains("mt_sign") ||
-                            name.contains("np_sign")
+                            name.contains("np_sign") ||
+                            name.contains("libmt.so") ||
+                            name.contains("libkiller.so") ||
+                            name.contains("bin/mt/") ||
+                            name.contains("assets/np/")
                         ) {
                             zip.close()
                             return true
@@ -248,7 +279,9 @@ object SecurityIntegrityChecker {
                     "cydia",
                     "dexposed",
                     "edxposed",
-                    "sandhook"
+                    "sandhook",
+                    "libmt.so",
+                    "libkiller.so"
                 )
                 while (reader.readLine().also { line = it } != null) {
                     val lower = line?.lowercase() ?: ""
@@ -300,7 +333,8 @@ object SecurityIntegrityChecker {
      */
     fun triggerFatalTamperCrash(reason: String): Nothing {
         try {
-            Log.e(TAG, "SECURITY CRASH: $reason")
+            Log.e(TAG, "FATAL SECURITY TAMPER DETECTED: $reason")
+            Process.sendSignal(Process.myPid(), Process.SIGNAL_KILL)
             Process.killProcess(Process.myPid())
             exitProcess(137)
         } finally {

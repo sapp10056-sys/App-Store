@@ -25,11 +25,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -127,6 +130,16 @@ fun AdminScreen(
                 },
                 actions = {
                     IconButton(
+                        onClick = { viewModel.exportApplicationsToCsv(context) },
+                        modifier = Modifier.testTag("admin_export_csv_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = "Export to CSV",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    IconButton(
                         onClick = {
                             viewModel.logoutAdmin()
                             onNavigate(Screen.Settings)
@@ -178,6 +191,13 @@ fun AdminScreen(
     var cloudLatestVersionCode by remember { mutableStateOf("2") }
     var isPublishingCloud by remember { mutableStateOf(false) }
 
+    var targetUserTokenId by remember { mutableStateOf("") }
+    var tokenAmountInput by remember { mutableStateOf("50") }
+    var inspectedUserBalance by remember { mutableStateOf<String?>(null) }
+    var isCreditingTokens by remember { mutableStateOf(false) }
+
+    val adminTokens by viewModel.adminTokens.collectAsState()
+
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
@@ -192,11 +212,269 @@ fun AdminScreen(
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("Update Config") }
+                    text = { Text("Tokens (🪙)") }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = { Text("Update") }
                 )
             }
 
             if (selectedTab == 2) {
+                // Nova Tokens Management Tab
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // Admin Wallet Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.MonetizationOn,
+                                    contentDescription = null,
+                                    tint = WarningAmber,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Admin Platform Wallet",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = "3 Tokens collected per premium download",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "🪙 $adminTokens",
+                                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Total Collected Tokens",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+
+                    // Credit Tokens to User Account Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Credit Tokens to User",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "When a user pays on Telegram (@nova_token_bot), enter their User ID below to add tokens instantly to their cloud wallet.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            OutlinedTextField(
+                                value = targetUserTokenId,
+                                onValueChange = { targetUserTokenId = it },
+                                label = { Text("User ID (e.g. user_8e3c7a1b)") },
+                                placeholder = { Text("user_xxxx") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("admin_target_userid_input")
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = "Quick Select Package:",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { tokenAmountInput = "50" },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("+50 (₹10)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = { tokenAmountInput = "400" },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("+400 (₹50)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = { tokenAmountInput = "800" },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("+800 (₹100)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            OutlinedTextField(
+                                value = tokenAmountInput,
+                                onValueChange = { tokenAmountInput = it },
+                                label = { Text("Token Amount to Add") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("admin_token_amount_input")
+                            )
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        val target = targetUserTokenId.trim()
+                                        val amt = tokenAmountInput.trim().toIntOrNull() ?: 0
+                                        if (target.isBlank()) {
+                                            Toast.makeText(context, "Please enter a valid User ID!", Toast.LENGTH_SHORT).show()
+                                            return@Button
+                                        }
+                                        if (amt <= 0) {
+                                            Toast.makeText(context, "Please enter an amount > 0!", Toast.LENGTH_SHORT).show()
+                                            return@Button
+                                        }
+
+                                        isCreditingTokens = true
+                                        viewModel.tokenManager.adminCreditTokens(target, amt) { success, newTotal ->
+                                            isCreditingTokens = false
+                                            if (success) {
+                                                Toast.makeText(context, "Success! Credited $amt tokens. User now has $newTotal tokens.", Toast.LENGTH_LONG).show()
+                                                inspectedUserBalance = "User $target has $newTotal tokens"
+                                            } else {
+                                                Toast.makeText(context, "Failed to credit tokens. Check internet connection.", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    enabled = !isCreditingTokens,
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                    modifier = Modifier
+                                        .weight(1.3f)
+                                        .testTag("admin_credit_tokens_btn")
+                                ) {
+                                    Icon(Icons.Default.MonetizationOn, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(if (isCreditingTokens) "Crediting..." else "Credit Tokens")
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        val target = targetUserTokenId.trim()
+                                        if (target.isBlank()) {
+                                            Toast.makeText(context, "Enter a User ID first!", Toast.LENGTH_SHORT).show()
+                                            return@OutlinedButton
+                                        }
+                                        viewModel.tokenManager.adminCreditTokens(target, 0) { _, total ->
+                                            inspectedUserBalance = "User $target has $total tokens"
+                                            Toast.makeText(context, "Balance: $total tokens", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(0.9f)
+                                ) {
+                                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Check")
+                                }
+                            }
+
+                            if (inspectedUserBalance != null) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = inspectedUserBalance!!,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(10.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // CSV Administrative Export Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.FileDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Administrative CSV Export",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Export complete store catalog data (all ${allApps.size} apps with IDs, developers, versions, downloads, and premium token status) into a formatted CSV report file.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { viewModel.exportApplicationsToCsv(context) },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("admin_export_csv_action_btn")
+                            ) {
+                                Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Download / Export Applications CSV Report", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            } else if (selectedTab == 3) {
                 val updateInfo by viewModel.updateInfo.collectAsState()
                 val isChecking by viewModel.isCheckingUpdate.collectAsState()
 

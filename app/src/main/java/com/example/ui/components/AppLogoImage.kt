@@ -77,7 +77,7 @@ fun AppLogoImage(
                     .data(resolvedUrl)
                     .crossfade(true)
                     .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
-                    .addHeader("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+                    .addHeader("Accept", "image/webp,image/png,image/jpeg,image/*;q=0.8")
                     .build()
             }
 
@@ -185,7 +185,7 @@ fun AppScreenshotImage(
                 .data(resolvedUrl)
                 .crossfade(true)
                 .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
-                .addHeader("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+                .addHeader("Accept", "image/webp,image/png,image/jpeg,image/*;q=0.8")
                 .build()
         }
 

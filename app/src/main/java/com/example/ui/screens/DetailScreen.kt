@@ -331,6 +331,41 @@ fun DetailScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            if (app.isPremium) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = WarningAmber.copy(alpha = 0.14f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = WarningAmber,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Premium APK Listing",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = WarningAmber
+                            )
+                            Text(
+                                text = "Requires 10 Nova Tokens to download. 7 tokens go to developer, 3 tokens platform fee.",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
             // Primary Download and Share Action Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -341,7 +376,7 @@ fun DetailScreen(
                     onClick = { onDownloadClick(app) },
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                        containerColor = if (app.isPremium) WarningAmber else MaterialTheme.colorScheme.primary
                     ),
                     modifier = Modifier
                         .weight(1f)
@@ -351,12 +386,14 @@ fun DetailScreen(
                     Icon(
                         imageVector = Icons.Default.Download,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
+                        tint = if (app.isPremium) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Download Latest APK (v${app.versionName})",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        text = if (app.isPremium) "Unlock & Download (🪙 10 Tokens)" else "Download Latest APK (v${app.versionName})",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = if (app.isPremium) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White
                     )
                 }
 

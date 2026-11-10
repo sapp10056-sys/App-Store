@@ -23,7 +23,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -84,6 +86,7 @@ fun HomeScreen(
     val featuredApps by viewModel.featuredApplications.collectAsState()
     val trendingApps by viewModel.trendingApplications.collectAsState()
     val isLoading by viewModel.repository.isLoading.collectAsState()
+    val userTokens by viewModel.userTokens.collectAsState()
     val context = LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -145,8 +148,52 @@ fun HomeScreen(
                             }
                         }
 
-                        // Actions in Header: Refresh + Share NovaStore + Submit
+                        // Actions in Header: Refresh + Export CSV + Share NovaStore + Token Wallet + Submit
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Nova Token Wallet Badge
+                            Surface(
+                                onClick = { viewModel.openTokenWallet() },
+                                shape = RoundedCornerShape(20.dp),
+                                color = WarningAmber.copy(alpha = 0.14f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber.copy(alpha = 0.4f)),
+                                modifier = Modifier
+                                    .testTag("header_token_wallet_btn")
+                                    .padding(end = 4.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MonetizationOn,
+                                        contentDescription = "Nova Tokens",
+                                        tint = WarningAmber,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "$userTokens",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+
+                            // Export to CSV Button
+                            IconButton(
+                                onClick = { viewModel.exportApplicationsToCsv(context) },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("header_export_csv_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FileDownload,
+                                    contentDescription = "Export to CSV",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
                             IconButton(
                                 onClick = { viewModel.refreshCatalog() },
                                 modifier = Modifier
@@ -161,7 +208,7 @@ fun HomeScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
 
                             IconButton(
                                 onClick = { AppShareHelper.shareNovaStoreApp(context) },
@@ -177,7 +224,7 @@ fun HomeScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
 
                             // Upload Shortcut
                             Button(
@@ -187,7 +234,7 @@ fun HomeScreen(
                                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                                 ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                                 modifier = Modifier.testTag("header_upload_button")
                             ) {
                                 Icon(
@@ -195,8 +242,8 @@ fun HomeScreen(
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Submit", fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Submit", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                             }
                         }
                     }

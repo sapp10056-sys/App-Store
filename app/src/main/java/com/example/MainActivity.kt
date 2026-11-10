@@ -8,6 +8,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
@@ -20,7 +23,9 @@ import com.example.security.SecurityIntegrityChecker
 import com.example.ui.components.BottomNavBar
 import com.example.ui.components.RewardedAdManager
 import com.example.ui.dialogs.DownloadConfirmDialog
+import com.example.ui.dialogs.PremiumAppUnlockDialog
 import com.example.ui.dialogs.ReportAppDialog
+import com.example.ui.dialogs.TokenWalletDialog
 import com.example.ui.dialogs.UpdateDialog
 import com.example.ui.screens.AdminScreen
 import com.example.ui.screens.DetailScreen
@@ -45,9 +50,11 @@ class MainActivity : ComponentActivity() {
         } catch (e: SecurityException) {
             throw e
         } catch (_: Exception) {}
-        try {
-            MobileAds.initialize(this) {}
-        } catch (_: Exception) {}
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                MobileAds.initialize(applicationContext) {}
+            } catch (_: Exception) {}
+        }
         handleIntent(intent)
         enableEdgeToEdge()
 
@@ -60,6 +67,9 @@ class MainActivity : ComponentActivity() {
                 val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
                 val apps by viewModel.repository.applications.collectAsState()
                 val admobConfig by viewModel.admobConfig.collectAsState()
+                val userTokens by viewModel.userTokens.collectAsState()
+                val showTokenWallet by viewModel.showTokenWallet.collectAsState()
+                val pendingPremiumUnlock by viewModel.pendingPremiumUnlockApp.collectAsState()
                 val rewardedAdManager = remember { RewardedAdManager(this@MainActivity) }
 
                 LaunchedEffect(admobConfig) {
@@ -170,6 +180,30 @@ class MainActivity : ComponentActivity() {
                             Toast.makeText(this@MainActivity, "Report submitted to moderators", Toast.LENGTH_SHORT).show()
                         },
                         onDismiss = { viewModel.dismissReportDialog() }
+                    )
+                }
+
+                // Nova Token Wallet Dialog
+                if (showTokenWallet) {
+                    TokenWalletDialog(
+                        tokenManager = viewModel.tokenManager,
+                        userTokens = userTokens,
+                        onDismiss = { viewModel.dismissTokenWallet() }
+                    )
+                }
+
+                // Premium App Unlock Dialog (10 tokens -> 7 to dev, 3 to admin)
+                pendingPremiumUnlock?.let { app ->
+                    PremiumAppUnlockDialog(
+                        app = app,
+                        tokenManager = viewModel.tokenManager,
+                        userTokens = userTokens,
+                        onUnlockedSuccess = {
+                            viewModel.onPremiumUnlocked(app)
+                        },
+                        onDismiss = {
+                            viewModel.dismissPremiumUnlockDialog()
+                        }
                     )
                 }
 
