@@ -252,9 +252,6 @@ fun PublishScreen(
                             onSelectAppForUpdate = { app ->
                                 viewModel.prefillForAppUpdate(app)
                                 currentStep = 2
-                            },
-                            onRedeemReferral = { code, callback ->
-                                viewModel.tokenManager.redeemReferralCode(code, callback)
                             }
                         )
                     }
@@ -428,8 +425,7 @@ private fun PublishPage1Login(
     onRegister: (String, String, String, String, (Boolean, String?) -> Unit) -> Unit,
     onLogout: () -> Unit,
     onProceedToStep2: () -> Unit,
-    onSelectAppForUpdate: (ApplicationItem) -> Unit,
-    onRedeemReferral: (String, (Boolean, String) -> Unit) -> Unit
+    onSelectAppForUpdate: (ApplicationItem) -> Unit
 ) {
     var authMode by remember { mutableIntStateOf(0) } // 0 = Sign In, 1 = Create Account
     var devId by remember { mutableStateOf("") }
@@ -763,21 +759,6 @@ private fun PublishPage1Login(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // OPTIONAL REFERRAL CODE FIELD
-            var referralCodeInput by remember { mutableStateOf("") }
-            OutlinedTextField(
-                value = referralCodeInput,
-                onValueChange = { referralCodeInput = it },
-                label = { Text("Referral Code (Optional - Claim 20 Tokens)") },
-                placeholder = { Text("e.g. NOVA-E31102") },
-                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(22.dp))
-
             // PRIMARY SUBMIT BUTTON
             Button(
                 onClick = {
@@ -793,30 +774,14 @@ private fun PublishPage1Login(
                     if (authMode == 0) {
                         onLogin(devId, devPass) { success, err ->
                             isAuthenticating = false
-                            if (success) {
-                                if (referralCodeInput.isNotBlank()) {
-                                    onRedeemReferral(referralCodeInput) { refSuccess, refMsg ->
-                                        if (refSuccess) {
-                                            authMessage = "🎉 Login successful & Referral bonus claimed: $refMsg"
-                                        }
-                                    }
-                                }
-                            } else {
+                            if (!success) {
                                 authMessage = err ?: "Invalid Developer ID or Password."
                             }
                         }
                     } else {
                         onRegister(devId, devName, devPass, devContact) { success, err ->
                             isAuthenticating = false
-                            if (success) {
-                                if (referralCodeInput.isNotBlank()) {
-                                    onRedeemReferral(referralCodeInput) { refSuccess, refMsg ->
-                                        if (refSuccess) {
-                                            authMessage = "🎉 Account created & Referral bonus claimed: $refMsg"
-                                        }
-                                    }
-                                }
-                            } else {
+                            if (!success) {
                                 authMessage = err ?: "Registration failed. Try a different ID."
                             }
                         }
