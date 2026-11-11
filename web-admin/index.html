@@ -165,8 +165,12 @@
         <span style="font-size: 0.75rem; color: var(--text-muted);">Firebase Firestore Backend • app-store-a9559</span>
       </div>
     </div>
-    <div style="font-size: 0.85rem; color: var(--success);">
-      ● Connected to Cloud Firestore
+    <div style="display: flex; gap: 1rem; align-items: center;">
+      <button class="action-btn" id="tabApps" style="background: var(--primary-dark); color: #fff;" onclick="switchTab('apps')">Applications Directory</button>
+      <button class="action-btn" id="tabReferrals" onclick="switchTab('referrals')">Referral History</button>
+      <div style="font-size: 0.85rem; color: var(--success); margin-left: 1rem;">
+        ● Connected to Cloud Firestore
+      </div>
     </div>
   </header>
 
@@ -190,31 +194,75 @@
       </div>
     </div>
 
-    <div class="card-header-bar">
-      <h2>Applications Directory</h2>
-      <input type="text" id="searchInput" class="search-input" placeholder="Search by name or developer...">
+    <!-- Applications Section -->
+    <div id="sectionApps">
+      <div class="card-header-bar">
+        <h2>Applications Directory</h2>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search by name or developer...">
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Application</th>
+              <th>Category</th>
+              <th>Version</th>
+              <th>Status</th>
+              <th>Reports</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="appsTableBody">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                Loading applications from Firestore...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Application</th>
-            <th>Category</th>
-            <th>Version</th>
-            <th>Status</th>
-            <th>Reports</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="appsTableBody">
-          <tr>
-            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-              Loading applications from Firestore...
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Referrals Section -->
+    <div id="sectionReferrals" style="display: none;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+        <div class="stat-card">
+          <h3>Total Referrals</h3>
+          <div class="value" id="stat-total-referrals" style="color: var(--secondary);">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Total Tokens Distributed</h3>
+          <div class="value" id="stat-total-referral-tokens" style="color: var(--success);">🪙 0</div>
+        </div>
+      </div>
+
+      <div class="card-header-bar">
+        <h2>Referral Activity & History</h2>
+        <input type="text" id="searchReferralInput" class="search-input" placeholder="Search referrer or referee...">
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Referrer ID</th>
+              <th>Referrer Code</th>
+              <th>Referred User</th>
+              <th>Tokens Earned</th>
+              <th>Date / Expiry (30 Days)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="referralsTableBody">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                Loading referrals from Firestore...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </main>
 
@@ -236,6 +284,17 @@
     const db = getFirestore(app);
 
     let allApps = [];
+    let allReferrals = [];
+
+    window.switchTab = (tab) => {
+      const isApps = tab === 'apps';
+      document.getElementById('sectionApps').style.display = isApps ? 'block' : 'none';
+      document.getElementById('sectionReferrals').style.display = isApps ? 'none' : 'block';
+      document.getElementById('tabApps').style.background = isApps ? 'var(--primary-dark)' : 'var(--surface-variant)';
+      document.getElementById('tabApps').style.color = isApps ? '#fff' : 'var(--text)';
+      document.getElementById('tabReferrals').style.background = !isApps ? 'var(--primary-dark)' : 'var(--surface-variant)';
+      document.getElementById('tabReferrals').style.color = !isApps ? '#fff' : 'var(--text)';
+    };
 
     // Real-time listener for applications collection
     onSnapshot(collection(db, "applications"), (snapshot) => {
@@ -246,13 +305,77 @@
       renderApps(allApps);
       updateStats(allApps);
     }, (error) => {
-      console.warn("Firestore listener fallback:", error);
-      document.getElementById("appsTableBody").innerHTML = `
-        <tr><td colspan="6" style="text-align: center; color: var(--warning); padding: 2rem;">
-          Firestore rule restriction or offline mode. Displaying localized admin cache.
-        </td></tr>
-      `;
+      console.warn("Firestore apps listener fallback:", error);
     });
+
+    // Real-time listener for referrals collection
+    onSnapshot(collection(db, "referrals"), (snapshot) => {
+      allReferrals = [];
+      snapshot.forEach(docSnap => {
+        allReferrals.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      renderReferrals(allReferrals);
+    }, (error) => {
+      console.warn("Firestore referrals listener fallback, trying RTDB:", error);
+      fetch("https://app-store-a9559-default-rtdb.asia-southeast1.firebasedatabase.app/referralLogs.json")
+        .then(res => res.json())
+        .then(data => {
+          if (data) {
+            allReferrals = Object.values(data);
+            renderReferrals(allReferrals);
+          }
+        })
+        .catch(err => {
+          document.getElementById("referralsTableBody").innerHTML = `
+            <tr><td colspan="6" style="text-align: center; color: var(--warning); padding: 2rem;">
+              No referrals found or offline mode.
+            </td></tr>
+          `;
+        });
+    });
+
+    function renderReferrals(referrals) {
+      const tbody = document.getElementById("referralsTableBody");
+      
+      // Calculate totals
+      let totalTokens = 0;
+      if (referrals && referrals.length > 0) {
+        referrals.forEach(ref => {
+          totalTokens += (ref.tokensToReferee || 20) + (ref.tokensToReferrer || 10);
+        });
+      }
+      document.getElementById("stat-total-referrals").innerText = referrals ? referrals.length : 0;
+      document.getElementById("stat-total-referral-tokens").innerText = "🪙 " + totalTokens;
+
+      if (!referrals || referrals.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No referral activity recorded yet.</td></tr>`;
+        return;
+      }
+
+      const now = Date.now();
+      tbody.innerHTML = referrals.map(ref => {
+        const timestamp = ref.timestamp || ref.grantedAt || now;
+        const expiresAt = ref.expiresAt || (timestamp + (30L * 24 * 60 * 60 * 1000));
+        const isExpired = now > expiresAt;
+        const dateStr = new Date(timestamp).toLocaleDateString();
+        const tokensEarned = (ref.tokensToReferee || 20) + (ref.tokensToReferrer || 10);
+        
+        return `
+          <tr>
+            <td><code style="color: var(--primary);">${escapeHtml(ref.referrerUserId || ref.referrer || 'N/A')}</code></td>
+            <td><span class="badge" style="background: rgba(167, 139, 250, 0.2); color: var(--secondary);">${escapeHtml(ref.referrerCode || 'NOVA')}</span></td>
+            <td><code>${escapeHtml(ref.refereeUserId || ref.referee || 'N/A')}</code></td>
+            <td style="font-weight: 700; color: var(--success);">🪙 +${tokensEarned} tokens</td>
+            <td>${dateStr}</td>
+            <td>
+              <span class="badge ${isExpired ? 'badge-rejected' : 'badge-published'}">
+                ${isExpired ? 'EXPIRED (30d)' : 'ACTIVE (30d)'}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
 
     function updateStats(apps) {
       document.getElementById("stat-total").innerText = apps.length;
@@ -320,6 +443,16 @@
         (a.developerName && a.developerName.toLowerCase().includes(q))
       );
       renderApps(filtered);
+    });
+
+    document.getElementById("searchReferralInput").addEventListener("input", (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const filtered = allReferrals.filter(r =>
+        (r.referrerUserId && r.referrerUserId.toLowerCase().includes(q)) ||
+        (r.refereeUserId && r.refereeUserId.toLowerCase().includes(q)) ||
+        (r.referrerCode && r.referrerCode.toLowerCase().includes(q))
+      );
+      renderReferrals(filtered);
     });
   </script>
 </body>

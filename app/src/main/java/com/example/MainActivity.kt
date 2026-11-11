@@ -143,6 +143,12 @@ class MainActivity : ComponentActivity() {
                                     onNavigate = { dest -> viewModel.navigateTo(dest) }
                                 )
                             }
+                            is Screen.Profile -> {
+                                com.example.ui.screens.ProfileScreen(
+                                    viewModel = viewModel,
+                                    onNavigate = { dest -> viewModel.navigateTo(dest) }
+                                )
+                            }
                             is Screen.Disclaimer -> {
                                 // Handled above
                             }

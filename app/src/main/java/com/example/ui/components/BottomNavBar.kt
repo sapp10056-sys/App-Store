@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Icon
@@ -78,6 +80,22 @@ fun BottomNavBar(
                 indicatorColor = MaterialTheme.colorScheme.primaryContainer
             ),
             modifier = Modifier.testTag("nav_settings")
+        )
+
+        NavigationBarItem(
+            selected = currentScreen is Screen.Profile,
+            onClick = { onNavigate(Screen.Profile) },
+            icon = {
+                Icon(
+                    imageVector = if (currentScreen is Screen.Profile) Icons.Filled.Person else Icons.Outlined.Person,
+                    contentDescription = "Profile"
+                )
+            },
+            label = { Text("Profile") },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = MaterialTheme.colorScheme.primaryContainer
+            ),
+            modifier = Modifier.testTag("nav_profile")
         )
     }
 }

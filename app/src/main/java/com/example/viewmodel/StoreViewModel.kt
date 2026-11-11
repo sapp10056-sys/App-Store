@@ -34,6 +34,7 @@ sealed class Screen {
     data object Publish : Screen()
     data object Settings : Screen()
     data object Admin : Screen()
+    data object Profile : Screen()
 }
 
 data class PublishFormState(
@@ -114,7 +115,9 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     val pendingPremiumUnlockApp: StateFlow<ApplicationItem?> = _pendingPremiumUnlockApp.asStateFlow()
 
     private val _currentScreen = MutableStateFlow<Screen>(
-        if (preferencesManager.isDisclaimerAccepted()) Screen.Home else Screen.Disclaimer
+        if (!preferencesManager.isDisclaimerAccepted()) Screen.Disclaimer
+        else if (repository.developerSessionManager.currentDeveloper.value == null) Screen.Publish
+        else Screen.Home
     )
     val currentScreen: StateFlow<Screen> = _currentScreen.asStateFlow()
 

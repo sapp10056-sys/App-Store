@@ -252,6 +252,9 @@ fun PublishScreen(
                             onSelectAppForUpdate = { app ->
                                 viewModel.prefillForAppUpdate(app)
                                 currentStep = 2
+                            },
+                            onRedeemReferral = { code, callback ->
+                                viewModel.tokenManager.redeemReferralCode(code, callback)
                             }
                         )
                     }
@@ -425,7 +428,8 @@ private fun PublishPage1Login(
     onRegister: (String, String, String, String, (Boolean, String?) -> Unit) -> Unit,
     onLogout: () -> Unit,
     onProceedToStep2: () -> Unit,
-    onSelectAppForUpdate: (ApplicationItem) -> Unit
+    onSelectAppForUpdate: (ApplicationItem) -> Unit,
+    onRedeemReferral: (String, (Boolean, String) -> Unit) -> Unit
 ) {
     var authMode by remember { mutableIntStateOf(0) } // 0 = Sign In, 1 = Create Account
     var devId by remember { mutableStateOf("") }
@@ -744,18 +748,33 @@ private fun PublishPage1Login(
                 Spacer(modifier = Modifier.height(12.dp))
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = if (authMessage!!.contains("success", ignoreCase = true) || authMessage!!.contains("created", ignoreCase = true)) SuccessGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.errorContainer,
+                    color = if (authMessage!!.contains("success", ignoreCase = true) || authMessage!!.contains("created", ignoreCase = true) || authMessage!!.contains("🎉", ignoreCase = true)) SuccessGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.errorContainer,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = authMessage!!,
                         modifier = Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (authMessage!!.contains("success", ignoreCase = true) || authMessage!!.contains("created", ignoreCase = true)) SuccessGreen else MaterialTheme.colorScheme.onErrorContainer,
+                        color = if (authMessage!!.contains("success", ignoreCase = true) || authMessage!!.contains("created", ignoreCase = true) || authMessage!!.contains("🎉", ignoreCase = true)) SuccessGreen else MaterialTheme.colorScheme.onErrorContainer,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // OPTIONAL REFERRAL CODE FIELD
+            var referralCodeInput by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = referralCodeInput,
+                onValueChange = { referralCodeInput = it },
+                label = { Text("Referral Code (Optional - Claim 20 Tokens)") },
+                placeholder = { Text("e.g. NOVA-E31102") },
+                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true
+            )
 
             Spacer(modifier = Modifier.height(22.dp))
 
@@ -774,14 +793,30 @@ private fun PublishPage1Login(
                     if (authMode == 0) {
                         onLogin(devId, devPass) { success, err ->
                             isAuthenticating = false
-                            if (!success) {
+                            if (success) {
+                                if (referralCodeInput.isNotBlank()) {
+                                    onRedeemReferral(referralCodeInput) { refSuccess, refMsg ->
+                                        if (refSuccess) {
+                                            authMessage = "🎉 Login successful & Referral bonus claimed: $refMsg"
+                                        }
+                                    }
+                                }
+                            } else {
                                 authMessage = err ?: "Invalid Developer ID or Password."
                             }
                         }
                     } else {
                         onRegister(devId, devName, devPass, devContact) { success, err ->
                             isAuthenticating = false
-                            if (!success) {
+                            if (success) {
+                                if (referralCodeInput.isNotBlank()) {
+                                    onRedeemReferral(referralCodeInput) { refSuccess, refMsg ->
+                                        if (refSuccess) {
+                                            authMessage = "🎉 Account created & Referral bonus claimed: $refMsg"
+                                        }
+                                    }
+                                }
+                            } else {
                                 authMessage = err ?: "Registration failed. Try a different ID."
                             }
                         }
