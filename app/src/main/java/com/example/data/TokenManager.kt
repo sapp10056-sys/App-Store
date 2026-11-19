@@ -855,7 +855,9 @@ class TokenManager(private val context: Context) {
             return
         }
 
-        val cost = app.tokenCost.coerceAtLeast(PREMIUM_DOWNLOAD_COST)
+        val cost = app.tokenCost.coerceAtLeast(1)
+        val adminCommission = (cost * 0.25).toInt().coerceAtLeast(1)
+        val devReward = cost - adminCommission
 
         scope.launch {
             try {
@@ -877,10 +879,10 @@ class TokenManager(private val context: Context) {
                     return@launch
                 }
 
-                // 2. Deduct 10 tokens from user (consumes 30-day referral grants first, then lifetime purchased tokens)
+                // 2. Deduct tokens from user (consumes 30-day referral grants first, then lifetime purchased tokens)
                 spendTokensFromUser(cost)
 
-                // 3. Credit 7 tokens to Developer
+                // 3. Credit dev reward (75%) to Developer
                 val devId = app.developerId.ifBlank { "anonymous_dev" }
                 if (devId.isNotBlank()) {
                     val devReq = Request.Builder()
@@ -892,11 +894,11 @@ class TokenManager(private val context: Context) {
                         val text = devResp.body?.string()?.trim()
                         if (!text.isNullOrBlank() && text != "null") text.toIntOrNull() ?: 0 else 0
                     } else 0
-                    val newDevBal = devCurrent + DEV_REWARD_TOKENS
+                    val newDevBal = devCurrent + devReward
                     updateCloudUserTokens(devId, newDevBal)
                 }
 
-                // 4. Credit 3 tokens to Admin Wallet
+                // 4. Credit admin commission (25% platform fee) to Admin Wallet
                 val adminReq = Request.Builder()
                     .url("$rtdbBaseUrl/adminWallet/balance.json")
                     .get()
@@ -906,7 +908,7 @@ class TokenManager(private val context: Context) {
                     val text = adminResp.body?.string()?.trim()
                     if (!text.isNullOrBlank() && text != "null") text.toIntOrNull() ?: 0 else _adminTokens.value
                 } else _adminTokens.value
-                val newAdminBal = adminCurrent + ADMIN_COMMISSION_TOKENS
+                val newAdminBal = adminCurrent + adminCommission
                 updateCloudAdminWallet(newAdminBal)
                 _adminTokens.value = newAdminBal
                 prefs.edit().putInt("cached_admin_tokens", newAdminBal).apply()
@@ -931,11 +933,11 @@ class TokenManager(private val context: Context) {
                     devId = devId,
                     appId = app.appId,
                     appName = app.appName,
-                    note = "Downloaded ${app.appName} ($cost tokens total: $DEV_REWARD_TOKENS to dev $devId, $ADMIN_COMMISSION_TOKENS to Admin)"
+                    note = "Downloaded ${app.appName} ($cost tokens total: $devReward to dev $devId, $adminCommission to Admin 25% fee)"
                 )
 
                 withContext(Dispatchers.Main) {
-                    onResult(true, "Successfully unlocked ${app.appName}! (10 tokens deducted: 7 to Dev, 3 to Admin)")
+                    onResult(true, "Successfully unlocked ${app.appName}! ($cost tokens deducted: $devReward to Dev, $adminCommission to Admin 25% fee)")
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -1110,17 +1112,20 @@ class TokenManager(private val context: Context) {
         const val BOT_URL = "https://t.me/nova_token_bot"
 
         // Token Pricing Packages
-        const val TIER_1_INR = 10
-        const val TIER_1_TOKENS = 50
+        const val TIER_1_INR = 50
+        const val TIER_1_TOKENS = 150
 
-        const val TIER_2_INR = 50
-        const val TIER_2_TOKENS = 400
+        const val TIER_2_INR = 100
+        const val TIER_2_TOKENS = 350
 
-        const val TIER_3_INR = 100
-        const val TIER_3_TOKENS = 800
+        const val TIER_3_INR = 200
+        const val TIER_3_TOKENS = 750
+
+        const val TIER_4_INR = 500
+        const val TIER_4_TOKENS = 2000
 
         // Fee Rules
-        const val PREMIUM_UPLOAD_COST = 20
+        const val PREMIUM_UPLOAD_COST = 350
         const val PREMIUM_DOWNLOAD_COST = 10
         const val DEV_REWARD_TOKENS = 7
         const val ADMIN_COMMISSION_TOKENS = 3

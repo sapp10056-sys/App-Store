@@ -143,6 +143,8 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            com.example.ui.components.AdsterraBannerView()
+            Spacer(modifier = Modifier.height(12.dp))
             // Nova Token Wallet Card
             Card(
                 modifier = Modifier.fillMaxWidth(),

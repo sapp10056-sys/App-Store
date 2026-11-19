@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -70,6 +71,7 @@ class MainActivity : ComponentActivity() {
                 val userTokens by viewModel.userTokens.collectAsState()
                 val showTokenWallet by viewModel.showTokenWallet.collectAsState()
                 val pendingPremiumUnlock by viewModel.pendingPremiumUnlockApp.collectAsState()
+                val isUserVerified by viewModel.isUserVerified.collectAsState()
                 val rewardedAdManager = remember { RewardedAdManager(this@MainActivity) }
 
                 LaunchedEffect(admobConfig) {
@@ -94,6 +96,8 @@ class MainActivity : ComponentActivity() {
                     DisclaimerScreen(
                         onAccept = { viewModel.acceptDisclaimer() }
                     )
+                } else if (!isUserVerified) {
+                    com.example.ui.screens.LoginScreen(viewModel = viewModel)
                 } else {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),

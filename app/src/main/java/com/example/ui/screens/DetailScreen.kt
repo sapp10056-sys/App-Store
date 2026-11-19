@@ -158,6 +158,9 @@ fun DetailScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            com.example.ui.components.AdsterraBannerView(
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
             // App Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),

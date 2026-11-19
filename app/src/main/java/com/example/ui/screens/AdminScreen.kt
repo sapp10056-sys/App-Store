@@ -216,6 +216,9 @@ fun AdminScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            com.example.ui.components.AdsterraBannerView(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
             // Dashboard Stats Grid (Displays 'Total Tokens in Circulation' fetched from Firestore 'tokenStats' document)
             Column(
                 modifier = Modifier

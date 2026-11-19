@@ -213,25 +213,32 @@ fun TokenWalletDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 TokenPackageItem(
-                    inr = 10,
-                    tokens = 50,
+                    inr = TokenManager.TIER_1_INR,
+                    tokens = TokenManager.TIER_1_TOKENS,
                     tag = "Starter",
-                    onClick = { tokenManager.openTelegramBot(context, "₹10 (50 Tokens)") }
+                    onClick = { tokenManager.openTelegramBot(context, "₹${TokenManager.TIER_1_INR} (${TokenManager.TIER_1_TOKENS} Tokens)") }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 TokenPackageItem(
-                    inr = 50,
-                    tokens = 400,
+                    inr = TokenManager.TIER_2_INR,
+                    tokens = TokenManager.TIER_2_TOKENS,
                     tag = "Popular (Best Value)",
                     isHighlight = true,
-                    onClick = { tokenManager.openTelegramBot(context, "₹50 (400 Tokens)") }
+                    onClick = { tokenManager.openTelegramBot(context, "₹${TokenManager.TIER_2_INR} (${TokenManager.TIER_2_TOKENS} Tokens)") }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 TokenPackageItem(
-                    inr = 100,
-                    tokens = 800,
+                    inr = TokenManager.TIER_3_INR,
+                    tokens = TokenManager.TIER_3_TOKENS,
                     tag = "Pro Developer",
-                    onClick = { tokenManager.openTelegramBot(context, "₹100 (800 Tokens)") }
+                    onClick = { tokenManager.openTelegramBot(context, "₹${TokenManager.TIER_3_INR} (${TokenManager.TIER_3_TOKENS} Tokens)") }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                TokenPackageItem(
+                    inr = TokenManager.TIER_4_INR,
+                    tokens = TokenManager.TIER_4_TOKENS,
+                    tag = "Enterprise",
+                    onClick = { tokenManager.openTelegramBot(context, "₹${TokenManager.TIER_4_INR} (${TokenManager.TIER_4_TOKENS} Tokens)") }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -252,7 +259,7 @@ fun TokenWalletDialog(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "• Premium APK Upload: Developer needs 20 tokens to list an APK.\n• Premium APK Download: 10 tokens per download.\n• Reward Split: 7 tokens go to the developer, 3 tokens go to admin.\n• Copy your User ID and message @nova_token_bot on Telegram to get tokens instantly.",
+                            text = "• Premium APK Upload: Developer sets custom coin price for unlocking.\n• Revenue Split: 75% goes to the developer, and 25% platform fee goes to Admin.\n• Copy your User ID and message @nova_token_bot on Telegram to get tokens instantly.",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 16.sp

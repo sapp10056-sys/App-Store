@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,11 +21,13 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +57,8 @@ fun AppCard(
     onShareClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -65,140 +71,182 @@ fun AppCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(14.dp)
         ) {
-            // App Logo with Image Preview & Fallback
-            AppLogoImage(
-                logoUrl = app.logoUrl,
-                appName = app.appName,
-                iconSize = 64.dp,
-                shape = RoundedCornerShape(14.dp)
-            )
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            // App Metadata
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = app.appName,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                // App Logo with Image Preview & Fallback
+                AppLogoImage(
+                    logoUrl = app.logoUrl,
+                    appName = app.appName,
+                    iconSize = 64.dp,
+                    shape = RoundedCornerShape(14.dp)
                 )
 
-                Text(
-                    text = app.developerName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Spacer(modifier = Modifier.width(14.dp))
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Category Badge
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                    ) {
-                        Text(
-                            text = app.category,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    // Version Pill
+                // App Metadata
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Text(
-                        text = "v${app.versionName}",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = app.appName,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
 
-                    if (app.rating > 0) {
+                    Text(
+                        text = app.developerName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Category Badge
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        ) {
+                            Text(
+                                text = app.category,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
                         Spacer(modifier = Modifier.width(6.dp))
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "Rating",
-                            tint = WarningAmber,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
+
+                        // Version Pill
                         Text(
-                            text = String.format("%.1f", app.rating),
+                            text = "v${app.versionName}",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
 
-                    if (app.isPremium) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = WarningAmber.copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = "🪙 ${app.tokenCost}",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
-                                color = WarningAmber,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        if (app.rating > 0) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "Rating",
+                                tint = WarningAmber,
+                                modifier = Modifier.size(12.dp)
                             )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = String.format("%.1f", app.rating),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (app.isPremium) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = WarningAmber.copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = "🪙 ${app.tokenCost}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                                    color = WarningAmber,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(6.dp))
 
-            if (onShareClick != null) {
-                IconButton(
-                    onClick = onShareClick,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("card_share_button_${app.appId}")
+                if (onShareClick != null) {
+                    IconButton(
+                        onClick = onShareClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("card_share_button_${app.appId}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share ${app.appName}",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+
+                // Download Button
+                Button(
+                    onClick = onDownloadClick,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.testTag("download_button_${app.appId}")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Share ${app.appName}",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Download",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "GET",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
             }
 
-            // Download Button
-            Button(
-                onClick = onDownloadClick,
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                modifier = Modifier.testTag("download_button_${app.appId}")
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Nova Support Option underneath every post
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/nova_store_support_bot"))
+                        context.startActivity(intent)
+                    }
+                    .padding(vertical = 4.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = "Download",
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.SupportAgent,
+                        contentDescription = "Nova Support",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Nova Support (Report / Chat)",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 Text(
-                    text = "GET",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    text = "@nova_store_support_bot ↗",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

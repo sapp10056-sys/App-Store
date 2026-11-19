@@ -103,6 +103,9 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
+                    com.example.ui.components.AdsterraBannerView(
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,

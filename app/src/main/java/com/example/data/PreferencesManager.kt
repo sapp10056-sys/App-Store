@@ -79,6 +79,30 @@ class PreferencesManager(context: Context) {
         prefs.edit().putString(KEY_ADMOB_REWARDED_UNIT_ID, unitId).apply()
     }
 
+    fun isUserVerified(): Boolean {
+        return prefs.getBoolean("user_verified", false)
+    }
+
+    fun setUserVerified(verified: Boolean) {
+        prefs.edit().putBoolean("user_verified", verified).apply()
+    }
+
+    fun getUserEmail(): String {
+        return prefs.getString("user_email", "") ?: ""
+    }
+
+    fun setUserEmail(email: String) {
+        prefs.edit().putString("user_email", email).apply()
+    }
+
+    fun getUserPhone(): String {
+        return prefs.getString("user_phone", "") ?: ""
+    }
+
+    fun setUserPhone(phone: String) {
+        prefs.edit().putString("user_phone", phone).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "novastore_preferences"
         private const val KEY_DISCLAIMER_ACCEPTED = "disclaimer_accepted"

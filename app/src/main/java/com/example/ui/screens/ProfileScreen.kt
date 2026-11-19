@@ -78,6 +78,7 @@ fun ProfileScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            com.example.ui.components.AdsterraBannerView()
             // Profile Header Card
             Card(
                 modifier = Modifier.fillMaxWidth(),

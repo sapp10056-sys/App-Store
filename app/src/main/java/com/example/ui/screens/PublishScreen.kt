@@ -207,6 +207,8 @@ fun PublishScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            com.example.ui.components.AdsterraBannerView()
+            Spacer(modifier = Modifier.height(4.dp))
             // STEP PROGRESS INDICATOR
             PublishStepProgressIndicator(
                 currentStep = currentStep,
@@ -1395,7 +1397,7 @@ private fun PublishPage2Details(
                                 color = WarningAmber
                             )
                             Text(
-                                text = "• User Download Cost: Users pay 10 tokens to download (7 tokens go to your account, 3 tokens platform fee).",
+                                text = "• User Download Cost: Users pay 350 tokens to unlock (75% developer share, 25% admin platform fee).",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = MaterialTheme.colorScheme.onSurface
                             )

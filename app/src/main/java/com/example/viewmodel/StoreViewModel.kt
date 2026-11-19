@@ -104,6 +104,31 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     val unlockedAppIds = tokenManager.unlockedAppIds
     val totalTokensInCirculation = repository.totalTokensInCirculation
 
+    private val _isUserVerified = MutableStateFlow(preferencesManager.isUserVerified())
+    val isUserVerified: StateFlow<Boolean> = _isUserVerified.asStateFlow()
+
+    fun verifyAndLoginUser(name: String, email: String, phone: String, onResult: (Boolean, String) -> Unit) {
+        val cleanEmail = email.trim()
+        val cleanPhone = phone.trim()
+        if (name.trim().length < 2) {
+            onResult(false, "Please enter your name.")
+            return
+        }
+        if (cleanEmail.isEmpty() || !cleanEmail.contains("@") || !cleanEmail.contains(".")) {
+            onResult(false, "Please enter a valid Gmail / email address.")
+            return
+        }
+        if (cleanPhone.length < 10) {
+            onResult(false, "Please enter a valid mobile number (at least 10 digits).")
+            return
+        }
+        preferencesManager.setUserVerified(true)
+        preferencesManager.setUserEmail(cleanEmail)
+        preferencesManager.setUserPhone(cleanPhone)
+        _isUserVerified.value = true
+        onResult(true, "Login & Verification successful!")
+    }
+
     fun syncTokenStatsToFirestore(circulation: Long) {
         repository.updateFirestoreTokenStats(circulation)
     }
@@ -576,7 +601,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                     screenshotUrls = form.screenshotUrls,
                     publicationStatus = "published",
                     isPremium = form.isPremium,
-                    tokenCost = if (form.isPremium) 10 else 0
+                    tokenCost = if (form.isPremium) 350 else 0
                 )
 
                 val result = repository.publishApplication(app, activeDev)
