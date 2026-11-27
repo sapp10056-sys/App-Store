@@ -754,30 +754,47 @@ fun AdminScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(6.dp))
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                OutlinedButton(
-                                    onClick = { tokenAmountInput = "50" },
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("+50 (₹10)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    OutlinedButton(
+                                        onClick = { tokenAmountInput = "150" },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("+150 (₹50)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    OutlinedButton(
+                                        onClick = { tokenAmountInput = "350" },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("+350 (₹100)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
-                                OutlinedButton(
-                                    onClick = { tokenAmountInput = "400" },
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("+400 (₹50)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                OutlinedButton(
-                                    onClick = { tokenAmountInput = "800" },
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("+800 (₹100)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    OutlinedButton(
+                                        onClick = { tokenAmountInput = "750" },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("+750 (₹200)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    OutlinedButton(
+                                        onClick = { tokenAmountInput = "2000" },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("+2000 (₹500)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
 

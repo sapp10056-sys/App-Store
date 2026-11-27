@@ -35,6 +35,11 @@ fun AdsterraBannerView(
                 };
             </script>
             <script type="text/javascript" src="https://bicea.org/22/c9e23b9f09f4aeac887add61cb10085d"></script>
+            <noscript>
+                <a href="https://auctionr.org/4/f16c21c90b52688fc650d4eabcb87569" target="_blank">
+                    <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=320&h=50&fit=crop" width="320" height="50" alt="Sponsored Ad"/>
+                </a>
+            </noscript>
         </body>
         </html>
     """.trimIndent()

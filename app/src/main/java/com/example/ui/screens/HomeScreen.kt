@@ -327,7 +327,7 @@ fun HomeScreen(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                items(featuredApps) { app ->
+                                items(items = featuredApps, key = { it.appId }) { app ->
                                     FeaturedAppCard(
                                         app = app,
                                         onClick = { viewModel.openAppDetails(app.appId) },
@@ -422,7 +422,7 @@ fun HomeScreen(
                     }
                 }
             } else {
-                items(filteredApps) { app ->
+                items(items = filteredApps, key = { it.appId }) { app ->
                     AppCard(
                         app = app,
                         onClick = { viewModel.openAppDetails(app.appId) },
