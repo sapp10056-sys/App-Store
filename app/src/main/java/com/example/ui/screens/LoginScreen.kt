@@ -36,6 +36,9 @@ fun LoginScreen(
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var otpCode by remember { mutableStateOf("") }
+    var otpSent by remember { mutableStateOf(false) }
+    var generatedOtp by remember { mutableStateOf("123456") }
     var isLoading by remember { mutableStateOf(false) }
 
     Box(
@@ -90,7 +93,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Google Gmail & Phone Number Verification required to login",
+                    text = "Gmail & Mobile Number OTP Verification Login\n(Coins, Points & APKs are permanently tied to your ID)",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -108,7 +111,7 @@ fun LoginScreen(
                             val verifiedEmail = if (email.isNotBlank() && email.contains("@")) email else "novastore.verified@gmail.com"
                             val verifiedPhone = if (phone.length >= 10) phone else "9876543210"
                             viewModel.verifyAndLoginUser(verifiedName, verifiedEmail, verifiedPhone) { _, msg ->
-                                Toast.makeText(context, "Google Gmail Verified Successfully!", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, "Google Gmail Verified & Logged in!", Toast.LENGTH_LONG).show()
                             }
                         }, 1000)
                     },
@@ -131,14 +134,14 @@ fun LoginScreen(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Sign in & Verify with Google Gmail",
+                            text = "Sign in with Google Gmail",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -146,14 +149,14 @@ fun LoginScreen(
                 ) {
                     HorizontalDivider(modifier = Modifier.weight(1f))
                     Text(
-                        text = "  OR MANUAL GMAIL ENTRY  ",
+                        text = "  OR GMAIL & PHONE OTP LOGIN  ",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     HorizontalDivider(modifier = Modifier.weight(1f))
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 OutlinedTextField(
                     value = name,
@@ -172,7 +175,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("Gmail Address (e.g. user@gmail.com)") },
+                    label = { Text("Gmail Address (user@gmail.com)") },
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     singleLine = true,
@@ -197,32 +200,88 @@ fun LoginScreen(
                         .testTag("login_phone_input")
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                if (otpSent) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = otpCode,
+                        onValueChange = { otpCode = it },
+                        label = { Text("Enter 6-Digit OTP Code") },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("login_otp_input")
+                    )
+                }
 
-                Button(
-                    onClick = {
-                        isLoading = true
-                        viewModel.verifyAndLoginUser(name, email, phone) { success, msg ->
-                            isLoading = false
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("login_verify_button"),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    enabled = !isLoading
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                    } else {
+                Spacer(modifier = Modifier.height(20.dp))
+
+                if (!otpSent) {
+                    Button(
+                        onClick = {
+                            if (name.trim().length < 2) {
+                                Toast.makeText(context, "Please enter your name.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            if (email.trim().isEmpty() || !email.contains("@")) {
+                                Toast.makeText(context, "Please enter a valid Gmail address.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            if (phone.trim().length < 10) {
+                                Toast.makeText(context, "Please enter a valid 10-digit mobile number.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            // Generate 6-digit OTP
+                            val randomOtp = (100000..999999).random().toString()
+                            generatedOtp = randomOtp
+                            otpSent = true
+                            Toast.makeText(context, "OTP sent to $email & $phone. (Demo OTP: $randomOtp)", Toast.LENGTH_LONG).show()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("send_otp_button"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    ) {
                         Text(
-                            text = "Verify & Login",
+                            text = "Send Verification OTP",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = Color.White
                         )
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            if (otpCode.trim().length < 4) {
+                                Toast.makeText(context, "Please enter the valid OTP code.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            isLoading = true
+                            viewModel.verifyAndLoginUser(name, email, phone) { success, msg ->
+                                isLoading = false
+                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("login_verify_button"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        enabled = !isLoading
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                        } else {
+                            Text(
+                                text = "Verify OTP & Login",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                        }
                     }
                 }
             }

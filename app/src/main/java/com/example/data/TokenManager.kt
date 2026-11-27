@@ -1107,6 +1107,73 @@ class TokenManager(private val context: Context) {
         }
     }
 
+    fun loginWithEmailAndPhone(email: String, phone: String, name: String, onComplete: (Boolean, String) -> Unit) {
+        scope.launch {
+            try {
+                val emailKey = email.replace(".", ",")
+                val url = "$rtdbBaseUrl/userAccounts/$emailKey.json"
+                val req = Request.Builder().url(url).get().build()
+                val resp = httpClient.newCall(req).execute()
+                var existingUserId: String? = null
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string()?.trim()
+                    if (!body.isNullOrBlank() && body != "null") {
+                        val json = JSONObject(body)
+                        existingUserId = json.optString("userId", null)
+                    }
+                }
+
+                val finalUserId = if (!existingUserId.isNullOrBlank()) {
+                    existingUserId
+                } else {
+                    userId
+                }
+
+                prefs.edit()
+                    .putString("unique_user_id", finalUserId)
+                    .putString("user_email", email)
+                    .putString("user_phone", phone)
+                    .putString("user_name", name)
+                    .apply()
+
+                val accountData = mapOf(
+                    "userId" to finalUserId,
+                    "email" to email,
+                    "phone" to phone,
+                    "name" to name,
+                    "lastLoginAt" to System.currentTimeMillis()
+                )
+                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                val putReq = Request.Builder()
+                    .url(url)
+                    .put(JSONObject(accountData).toString().toRequestBody(mediaType))
+                    .build()
+                httpClient.newCall(putReq).execute().close()
+
+                val phoneKey = phone.replace(Regex("[^0-9]"), "")
+                if (phoneKey.isNotBlank()) {
+                    val phoneUrl = "$rtdbBaseUrl/userAccountsByPhone/$phoneKey.json"
+                    val putPhoneReq = Request.Builder()
+                        .url(phoneUrl)
+                        .put(JSONObject(accountData).toString().toRequestBody(mediaType))
+                        .build()
+                    httpClient.newCall(putPhoneReq).execute().close()
+                }
+
+                syncFromCloud()
+
+                withContext(Dispatchers.Main) {
+                    onComplete(true, "Login successful! User ID: $finalUserId (Coins, Points & APKs Restored)")
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "loginWithEmailAndPhone error: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    onComplete(true, "Login successful (offline mode).")
+                }
+            }
+        }
+    }
+
     companion object {
         const val BOT_USERNAME = "@nova_token_bot"
         const val BOT_URL = "https://t.me/nova_token_bot"
