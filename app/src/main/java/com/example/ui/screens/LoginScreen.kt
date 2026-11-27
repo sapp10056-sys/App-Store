@@ -93,7 +93,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Gmail & Mobile Number OTP Verification Login\n(Coins, Points & APKs are permanently tied to your ID)",
+                    text = "Login via Gmail or Mobile Number OTP\n(Coins, Points & APKs are permanently tied to your ID)",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -149,7 +149,7 @@ fun LoginScreen(
                 ) {
                     HorizontalDivider(modifier = Modifier.weight(1f))
                     Text(
-                        text = "  OR GMAIL & PHONE OTP LOGIN  ",
+                        text = "  OR GMAIL / SMS OTP LOGIN  ",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -175,7 +175,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("Gmail Address (user@gmail.com)") },
+                    label = { Text("Gmail Address (Optional if phone provided)") },
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     singleLine = true,
@@ -190,7 +190,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it },
-                    label = { Text("Mobile Number (10 digits)") },
+                    label = { Text("Mobile Number (Optional if Gmail provided)") },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
@@ -225,19 +225,18 @@ fun LoginScreen(
                                 Toast.makeText(context, "Please enter your name.", Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
-                            if (email.trim().isEmpty() || !email.contains("@")) {
-                                Toast.makeText(context, "Please enter a valid Gmail address.", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-                            if (phone.trim().length < 10) {
-                                Toast.makeText(context, "Please enter a valid 10-digit mobile number.", Toast.LENGTH_SHORT).show()
+                            val hasEmail = email.trim().isNotBlank() && email.contains("@")
+                            val hasPhone = phone.trim().length >= 10
+                            if (!hasEmail && !hasPhone) {
+                                Toast.makeText(context, "Please enter either a valid Gmail address or 10-digit mobile number.", Toast.LENGTH_LONG).show()
                                 return@Button
                             }
                             // Generate 6-digit OTP
                             val randomOtp = (100000..999999).random().toString()
                             generatedOtp = randomOtp
                             otpSent = true
-                            Toast.makeText(context, "OTP sent to $email & $phone. (Demo OTP: $randomOtp)", Toast.LENGTH_LONG).show()
+                            val destination = if (hasEmail) "Gmail ($email)" else "Mobile Number ($phone)"
+                            Toast.makeText(context, "OTP sent successfully via " + (if (hasEmail) "Gmail" else "SMS") + " to $destination. (Demo OTP: $randomOtp)", Toast.LENGTH_LONG).show()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -247,7 +246,7 @@ fun LoginScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                     ) {
                         Text(
-                            text = "Send Verification OTP",
+                            text = "Send OTP via Gmail / SMS",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = Color.White
                         )
@@ -260,7 +259,9 @@ fun LoginScreen(
                                 return@Button
                             }
                             isLoading = true
-                            viewModel.verifyAndLoginUser(name, email, phone) { success, msg ->
+                            val resolvedEmail = if (email.isNotBlank() && email.contains("@")) email.trim() else "${phone.trim()}@novastore.mobile"
+                            val resolvedPhone = if (phone.isNotBlank()) phone.trim() else "9876543210"
+                            viewModel.verifyAndLoginUser(name, resolvedEmail, resolvedPhone) { success, msg ->
                                 isLoading = false
                                 Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                             }
