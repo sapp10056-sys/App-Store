@@ -104,16 +104,20 @@ fun LoginScreen(
                 // Google Gmail Sign-In / Verify Button
                 OutlinedButton(
                     onClick = {
+                        val cleanEmail = email.trim()
+                        if (cleanEmail.isEmpty() || !cleanEmail.contains("@")) {
+                            Toast.makeText(context, "Please enter your Gmail address above to verify with Google.", Toast.LENGTH_LONG).show()
+                            return@OutlinedButton
+                        }
                         isLoading = true
                         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                             isLoading = false
                             val verifiedName = if (name.isNotBlank()) name else "Google Verified User"
-                            val verifiedEmail = if (email.isNotBlank() && email.contains("@")) email else "novastore.verified@gmail.com"
                             val verifiedPhone = if (phone.length >= 10) phone else "9876543210"
-                            viewModel.verifyAndLoginUser(verifiedName, verifiedEmail, verifiedPhone) { _, msg ->
-                                Toast.makeText(context, "Google Gmail Verified & Logged in!", Toast.LENGTH_LONG).show()
+                            viewModel.verifyAndLoginUser(verifiedName, cleanEmail, verifiedPhone) { _, msg ->
+                                Toast.makeText(context, "Google Gmail ($cleanEmail) Verified & Logged in successfully!", Toast.LENGTH_LONG).show()
                             }
-                        }, 1000)
+                        }, 800)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -202,6 +206,35 @@ fun LoginScreen(
 
                 if (otpSent) {
                     Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Display on-screen OTP banner so user doesn't wait for SMS
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "🔑 Your Verification OTP Code",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = generatedOtp,
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "(Enter this code below to login instantly)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = otpCode,
                         onValueChange = { otpCode = it },
@@ -236,7 +269,7 @@ fun LoginScreen(
                             generatedOtp = randomOtp
                             otpSent = true
                             val destination = if (hasEmail) "Gmail ($email)" else "Mobile Number ($phone)"
-                            Toast.makeText(context, "OTP sent successfully via " + (if (hasEmail) "Gmail" else "SMS") + " to $destination. (Demo OTP: $randomOtp)", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "OTP generated for $destination: $randomOtp", Toast.LENGTH_LONG).show()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
