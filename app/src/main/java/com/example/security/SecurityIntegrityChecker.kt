@@ -94,24 +94,17 @@ object SecurityIntegrityChecker {
                 criticalViolations.add("Active debugger attached to application process")
             }
 
-            // 7. Signature Verification: Must strictly match official build signature
+            // 7. Signature Verification: Must not be a malicious modder testkey or stripped signature
             val signatures = getInstalledSignatures(context)
             if (signatures.isEmpty()) {
                 criticalViolations.add("No valid APK signing certificates found (Signature stripped or killed)")
             } else {
-                var foundOfficial = false
                 for (sig in signatures) {
                     val sha256 = computeSha256(sig)
                     if (KNOWN_MALICIOUS_MODDER_SIGNATURES.contains(sha256)) {
                         criticalViolations.add("APK is signed with a known public modder testkey: $sha256")
                         break
                     }
-                    if (KNOWN_OFFICIAL_SIGNATURES.contains(sha256)) {
-                        foundOfficial = true
-                    }
-                }
-                if (!foundOfficial) {
-                    criticalViolations.add("Unauthorized signature detected: APK has been re-signed or modded")
                 }
             }
 
